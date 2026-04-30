@@ -13,11 +13,11 @@ def create_app(test_config=None):
         app.config.update(test_config)
 
     sample_user = {
-        "username": "logan",
+        "username": "example_user",
         "profile_pic": "https://placehold.co/160x160?text=Profile",
         "age": 21,
         "gender": "Not set",
-        "email": "logan@example.com",
+        "email": "example_user@example.com",
         "questions": [
             {"question": "Favorite music genre?", "answer": "Jazz"},
             {"question": "Dream travel spot?", "answer": "Germany"},
