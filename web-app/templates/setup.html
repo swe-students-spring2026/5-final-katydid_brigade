@@ -30,18 +30,6 @@
   </div>
 
   <div class="question-list">
-    {% set questions = [
-      "Favorite music genre?",
-      "Dream travel spot?",
-      "Favorite hobby?",
-      "Favorite food?",
-      "Favorite movie type?",
-      "Best school subject?",
-      "Morning or night?",
-      "Favorite season?",
-      "Coffee or tea?",
-      "Favorite game?"
-    ] %}
     {% for question in questions %}
       <label>
         {{ loop.index }}. {{ question }}

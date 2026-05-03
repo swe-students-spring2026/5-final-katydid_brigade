@@ -1,8 +1,10 @@
 """Flask Web app - backend for Word Game and Matchmaking"""
 
 import os
+import requests as http
 
 from datetime import date
+from ./game_engine/game_engine/game_engine_client import evaluate_guess
 from flask import Flask, flash, jsonify, redirect, render_template, request, session, url_for
 from pymongo import MongoClient
 from bson.objectid import ObjectId
@@ -71,27 +73,84 @@ def create_app(test_config=None):
             return redirect(url_for("setup"))
         return render_template("register.html")
 
+    #setup
+    SETUP_QUESTIONS = [
+        "Favorite music genre?",
+        "Dream travel spot?",
+        "Favorite hobby?",
+        "Favorite food?",
+        "Favorite movie type?",
+        "Best school subject?",
+        "Morning or night?",
+        "Favorite season?",
+        "Coffee or tea?",
+        "Favorite game?",
+    ]
+
     @app.route("/setup", methods=["GET", "POST"])
     def setup():
-        if request.method == "POST":
-            return redirect(url_for("dashboard"))
-        return render_template("setup.html")
+        user = get_current_user()
+        if not user:
+            return redirect(url_for("login"))
 
+        if request.method == "POST":
+            db.users.update_one(
+                {"_id": user["_id"]},
+                {"$set": {
+                    "age": int(request.form.get("age")),
+                    "gender": request.form.get("gender"),
+                    "profile_pic": request.form.get("profile_pic", ""),
+                    "contact_info": request.form.get("contact_info", ""),
+                }}
+            )
+
+            engine_url = app.config["GAME_ENGINE_URL"]
+
+            for i, question in enumerate(SETUP_QUESTIONS, start=1):
+                answer = request.form.get(f"answer_{i}")
+                puzzle_data = create_puzzle(engine_url, question=question, answer=answer)
+                db.puzzles.insert_one({
+                    "owner_user_id": session["user_id"],
+                    "question": puzzle_data["question"],
+                    "answer": puzzle_data["answer"],
+                    "board": puzzle_data["board"],
+                    "max_attempts": puzzle_data["max_attempts"],
+                })
+\
+            return redirect(url_for("dashboard"))
+        return render_template("setup.html", questions=SETUP_QUESTIONS)
+
+    # dashboard
     @app.route("/dashboard", methods=["GET", "POST"])
     def dashboard():
+        engine_url = app.config["GAME_ENGINE_URL"]
         result = None
+
         if request.method == "POST":
+            puzzle = db.puzzles.find_one({"date": str(date.today())})
+            
+            guess = request.form.get("answer_1")  
+            previous_guesses = session.get("guesses", [])
+
+            outcome = evaluate_guess(
+                engine_url,
+                question=puzzle["question"],
+                answer=puzzle["answer"],
+                board=puzzle["board"],
+                guess=guess,
+                previous_guesses=previous_guesses,
+            )
+
+            session.setdefault("guesses", []).append(guess)
+
             result = {
-                "score": 10,
-                "total": 10,
-                "matched": True,
+                "score": 1 if outcome["is_correct"] else 0,
+                "total": 1,
+                "matched": outcome["puzzle_solved"],
             }
-        return render_template(
-            "dashboard.html",
-            candidate=daily_candidate,
-            today=date.today(),
-            result=result,
-        )
+
+        candidate = db.users.find_one({"is_candidate": True}) 
+        return render_template("dashboard.html", candidate=candidate, today=date.today(), result=result)
 
     @app.route("/matches")
     def matches_page():
