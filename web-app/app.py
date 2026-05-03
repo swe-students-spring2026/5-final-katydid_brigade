@@ -1,14 +1,12 @@
 """Flask Web app - backend for Word Game and Matchmaking"""
 
-import request
+import os
+
 from datetime import date
-from flask import Flask, jsonify, redirect, render_template, request, url_for
+from flask import Flask, flash, jsonify, redirect, render_template, request, session, url_for
 from pymongo import MongoClient
 from bson.objectid import ObjectId
-
-# register
-
-# login
+from config import Config
 
 # generate puzzle
 
@@ -22,74 +20,54 @@ from bson.objectid import ObjectId
 
 def create_app(test_config=None):
     app = Flask(__name__)
-    app.config.from_mapping(
-        SECRET_KEY="dev",
-    )
+
 
     if test_config:
         app.config.update(test_config)
+    else:
+        app.config.from_object(Config)
 
-    sample_user = {
-        "username": "example_user",
-        "profile_pic": "https://placehold.co/160x160?text=Profile",
-        "age": 21,
-        "gender": "Not set",
-        "email": "example_user@example.com",
-        "questions": [
-            {"question": "Favorite music genre?", "answer": "Jazz"},
-            {"question": "Dream travel spot?", "answer": "Germany"},
-            {"question": "Favorite hobby?", "answer": "Coding"},
-        ],
-    }
-
-    daily_candidate = {
-        "username": "morgan",
-        "profile_pic": "https://placehold.co/160x160?text=Match",
-        "age": 22,
-        "gender": "Not set",
-        "questions": [
-            {"question": "Favorite music genre?", "answer": ""},
-            {"question": "Dream travel spot?", "answer": ""},
-            {"question": "Favorite hobby?", "answer": ""},
-            {"question": "Favorite food?", "answer": ""},
-            {"question": "Favorite movie type?", "answer": ""},
-            {"question": "Best school subject?", "answer": ""},
-            {"question": "Morning or night?", "answer": ""},
-            {"question": "Favorite season?", "answer": ""},
-            {"question": "Coffee or tea?", "answer": ""},
-            {"question": "Favorite game?", "answer": ""},
-        ],
-    }
-
-    matches = [
-        {
-            "id": 1,
-            "username": "morgan",
-            "profile_pic": "https://placehold.co/128x128?text=M",
-            "age": 22,
-            "gender": "Not set",
-            "email": "morgan@example.com",
-            "questions": [
-                {"question": "Favorite music genre?", "answer": "Jazz"},
-                {"question": "Dream travel spot?", "answer": "Germany"},
-                {"question": "Favorite hobby?", "answer": "Coding"},
-            ],
-        }
-    ]
+    # MongoDB
+    client = MongoClient(app.config["MONGO_URI"])
+    db = client["katydid_brigade"]
 
     @app.route("/")
     def index():
         return render_template("index.html")
 
+   # login
     @app.route("/login", methods=["GET", "POST"])
     def login():
         if request.method == "POST":
+            username = request.form.get("username")
+            password = request.form.get("password")
+
+            user = db.users.find_one({"username": username, "password": password})
+            if not user:
+                flash("Invalid username or password")
+                return render_template("login.html")
+
             return redirect(url_for("dashboard"))
         return render_template("login.html")
 
+   # register
     @app.route("/register", methods=["GET", "POST"])
     def register():
         if request.method == "POST":
+            username = request.form.get("username")
+            email = request.form.get("email")
+            password = request.form.get("password")
+
+            if db.users.find_one({"username": username}):
+                flash("That username is already taken")
+                return redirect(url_for("register"))
+
+            db.users.insert_one({
+                "username": username,
+                "email": email,
+                "password": password,
+            })
+
             return redirect(url_for("setup"))
         return render_template("register.html")
 
@@ -145,4 +123,4 @@ def create_app(test_config=None):
 app = create_app()
 
 if __name__ == "__main__":
-  app.run(host="0.0.0.0", port=5000,m debug=True)
+  app.run(host="0.0.0.0", port=8000)
