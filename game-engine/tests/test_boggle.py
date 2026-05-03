@@ -1,4 +1,5 @@
 from game_engine import (
+    BOARD_SIZE,
     BogglePuzzle,
     PuzzleSession,
     generate_boggle_board,
@@ -99,3 +100,80 @@ def test_session_blocks_guesses_after_solve() -> None:
 
     with pytest.raises(ValueError, match="Puzzle already solved."):
         session.submit_guess("planet")
+
+
+def test_is_word_on_board_returns_true_for_valid_path() -> None:
+    # Board where "abcfg" is traceable top-left to bottom-right diagonally
+    board = (
+        ("a", "b", "c", "d"),
+        ("e", "f", "g", "h"),
+        ("i", "j", "k", "l"),
+        ("m", "n", "o", "p"),
+    )
+    assert is_word_on_board(board, "abcfg")
+
+
+def test_is_word_on_board_returns_false_for_non_adjacent_letters() -> None:
+    board = (
+        ("a", "b", "c", "d"),
+        ("e", "f", "g", "h"),
+        ("i", "j", "k", "l"),
+        ("m", "n", "o", "p"),
+    )
+    # 'a' is at (0,0) and 'k' is at (2,2) — not adjacent
+    assert not is_word_on_board(board, "akbcd")
+
+
+def test_session_reports_on_board_but_wrong_answer() -> None:
+    puzzle = BogglePuzzle.from_answer(
+        question="Favorite place?",
+        answer="forest",
+        seed=3,
+    )
+    # Find a word that IS traceable on the generated board but is not 'forest'
+    session = PuzzleSession(puzzle=puzzle)
+    # Submit the answer itself first to confirm the board is valid, then
+    # test a word that is on the board
+    wrong_word = puzzle.answer  # use answer to confirm path, then test separately
+
+    # More useful: test the case where is_on_board=True, is_correct=False
+    # by submitting a word we know is traceable but not the answer.
+    # We do this by crafting a minimal board directly.
+    # "planet": p(0,0)→l(0,1)→a(0,2)→n(1,2)[diag]→e(2,2)[vert]→t(2,3)[horiz]
+    custom_board = (
+        ("p", "l", "a", "z"),
+        ("z", "z", "n", "z"),
+        ("z", "z", "e", "t"),
+        ("z", "z", "z", "z"),
+    )
+    # 'planet' is traceable on this board (p→l→a→n→e→t)
+    custom_puzzle = BogglePuzzle(
+        question="Favorite place?",
+        answer="forest",  # hidden answer is 'forest', not 'planet'
+        board=custom_board,
+    )
+    custom_session = PuzzleSession(puzzle=custom_puzzle)
+    result = custom_session.submit_guess("planet")
+
+    assert result.is_on_board is True
+    assert result.is_correct is False
+    assert result.puzzle_solved is False
+
+
+def test_generate_boggle_board_has_correct_shape() -> None:
+    board = generate_boggle_board("storm", seed=99)
+    assert len(board) == BOARD_SIZE
+    assert all(len(row) == BOARD_SIZE for row in board)
+    assert all(
+        isinstance(cell, str) and len(cell) == 1 for row in board for cell in row
+    )
+
+
+def test_boggle_puzzle_from_answer_rejects_short_word() -> None:
+    with pytest.raises(ValueError):
+        BogglePuzzle.from_answer(question="Test?", answer="hi")
+
+
+def test_boggle_puzzle_from_answer_rejects_long_word() -> None:
+    with pytest.raises(ValueError):
+        BogglePuzzle.from_answer(question="Test?", answer="extraordinarily")
