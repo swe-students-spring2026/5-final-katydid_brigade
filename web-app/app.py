@@ -24,13 +24,22 @@ def create_app(test_config=None):
 
 
     if test_config:
-        app.config.update(test_config)
+        if isinstance(test_config, dict):
+            app.config.update(test_config)
+        else:
+            app.config.from_object(test_config)
     else:
         app.config.from_object(Config)
 
     # MongoDB
     client = MongoClient(app.config["MONGO_URI"])
     db = client["katydid_brigade"]
+
+    # current user
+    def get_current_user():
+        if "user_id" not in session:
+            return None
+        return db.users.find_one({"_id": ObjectId(session["user_id"])})
 
     @app.route("/")
     def index():
@@ -154,23 +163,36 @@ def create_app(test_config=None):
                 "total": len(puzzles),
                 "matched": correct_count == len(puzzles),
             }
+
+            if correct_count == len(puzzles) and candidate:
+                db.matches.insert_one({
+                    "solver_user_id": session.get("user_id"),
+                    "target_user_id": str(candidate["_id"]),
+                    "status": "matched",
+                    "matched_at": date.today().isoformat(),
+                })
         return render_template("dashboard.html", candidate=candidate, today=date.today(), result=result)
 
     @app.route("/matches")
     def matches_page():
+        user_id = session.get("user_id")
+        matches = list(db.matches.find({
+            "$or": [{"solver_user_id": user_id}, {"target_user_id": user_id}]
+        }))
         return render_template("matches.html", matches=matches)
 
     @app.route("/matches/<int:match_id>")
     def match_detail(match_id):
-        match = next((item for item in matches if item["id"] == match_id), None)
+        match = db.matches.find_one({"_id": ObjectId(match_id)})
         if match is None:
             return render_template("404.html"), 404
         return render_template("match_detail.html", match=match)
 
     @app.route("/profile", methods=["GET", "POST"])
     def profile():
+        user = get_current_user() or {}
         saved = request.method == "POST"
-        return render_template("profile.html", user=sample_user, saved=saved)
+        return render_template("profile.html", user=user, saved=saved)
 
     @app.route("/settings", methods=["GET", "POST"])
     def settings():

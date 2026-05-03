@@ -1,14 +1,11 @@
 import pytest
 from app import create_app
+from config import TestConfig
 
 
 @pytest.fixture()
 def client():
-    app = create_app(test_config={
-        "TESTING": True, 
-        "SECRET_KEY": "test",
-        "MONGO_URI": "mongodb://localhost:27017/test_db"
-    })
+    app = create_app(test_config=TestConfig)
     with app.test_client() as c:
         yield c
 
