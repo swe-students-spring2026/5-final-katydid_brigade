@@ -181,9 +181,12 @@ def create_app(test_config=None):
         }))
         return render_template("matches.html", matches=matches)
 
-    @app.route("/matches/<int:match_id>")
+    @app.route("/matches/<match_id>")
     def match_detail(match_id):
-        match = db.matches.find_one({"_id": ObjectId(match_id)})
+        try:
+            match = db.matches.find_one({"_id": ObjectId(match_id)})
+        except Exception:
+            match = None
         if match is None:
             return render_template("404.html"), 404
         return render_template("match_detail.html", match=match)
