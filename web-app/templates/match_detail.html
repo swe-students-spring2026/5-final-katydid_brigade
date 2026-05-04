@@ -1,10 +1,14 @@
 {% extends "base.html" %}
 
-{% block title %}{{ match.username }} | Question Match{% endblock %}
+{% block title %}{{ match.username }} | PlaceHolder Name{% endblock %}
 
 {% block content %}
 <section class="profile-strip">
-  <img src="{{ match.profile_pic }}" alt="{{ match.username }} profile picture">
+  {% if profile_image_url(match) %}
+    <img src="{{ profile_image_url(match) }}" alt="{{ match.username }} profile picture">
+  {% else %}
+    <div class="profile-placeholder" aria-hidden="true">{{ match.username[:1] }}</div>
+  {% endif %}
   <div>
     <p class="eyebrow">Matched profile</p>
     <h1>{{ match.username }}</h1>

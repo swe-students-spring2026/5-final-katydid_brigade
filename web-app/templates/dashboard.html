@@ -1,6 +1,6 @@
 {% extends "base.html" %}
 
-{% block title %}Dashboard | Question Match{% endblock %}
+{% block title %}Dashboard | PlaceHolder Name{% endblock %}
 
 {% block content %}
 <section class="content-header">
@@ -20,23 +20,39 @@
   </section>
 {% endif %}
 
-<section class="profile-strip">
-  <img src="{{ candidate.profile_pic }}" alt="{{ candidate.username }} profile picture">
-  <div>
-    <h2>{{ candidate.username }}</h2>
-    <p class="muted">Age {{ candidate.age }} · {{ candidate.gender }}</p>
-  </div>
-</section>
+{% if candidate %}
+  <section class="profile-strip">
+    {% if profile_image_url(candidate) %}
+      <img src="{{ profile_image_url(candidate) }}" alt="{{ candidate.username }} profile picture">
+    {% else %}
+      <div class="profile-placeholder" aria-hidden="true">{{ candidate.username[:1] }}</div>
+    {% endif %}
+    <div>
+      <h2>{{ candidate.username }}</h2>
+      <p class="muted">Age {{ candidate.age }} - {{ candidate.gender }}</p>
+    </div>
+  </section>
 
-<form method="post" class="form wide-form">
-  <div class="question-list">
-    {% for item in candidate.questions %}
-      <label>
-        {{ loop.index }}. {{ item.question }}
-        <input name="answer_{{ loop.index }}" maxlength="10" required>
-      </label>
-    {% endfor %}
-  </div>
-  <button class="button primary" type="submit">Submit answers</button>
-</form>
+  {% if candidate.questions %}
+    <form method="post" class="form wide-form">
+      <div class="question-list">
+        {% for item in candidate.questions %}
+          <label>
+            {{ loop.index }}. {{ item.question }}
+            <input name="answer_{{ loop.index }}" maxlength="10" required>
+          </label>
+        {% endfor %}
+      </div>
+      <button class="button primary" type="submit">Submit answers</button>
+    </form>
+  {% else %}
+    <section class="notice">
+      This profile does not have questions yet.
+    </section>
+  {% endif %}
+{% else %}
+  <section class="notice">
+    No other profiles are ready yet. Register another user to create a daily challenge.
+  </section>
+{% endif %}
 {% endblock %}
