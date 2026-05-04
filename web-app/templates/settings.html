@@ -5,26 +5,73 @@
 {% block content %}
 <section class="content-header">
   <h1>Settings</h1>
-  <p class="muted">Manage account security.</p>
+  <p class="muted">Manage your account, match profile, and question answers.</p>
 </section>
 
 {% if saved %}
-  <section class="notice success">Password changed.</section>
+  <section class="notice success">Settings saved.</section>
 {% endif %}
 
-<form method="post" class="form">
-  <label>
-    Current password
-    <input name="current_password" type="password" autocomplete="current-password" required>
-  </label>
-  <label>
-    New password
-    <input name="new_password" type="password" autocomplete="new-password" required>
-  </label>
-  <label>
-    Confirm new password
-    <input name="confirm_password" type="password" autocomplete="new-password" required>
-  </label>
-  <button class="button primary" type="submit">Change password</button>
+<form method="post" class="form wide-form" enctype="multipart/form-data">
+  <section class="profile-strip">
+    {% if profile_image_url(user) %}
+      <img src="{{ profile_image_url(user) }}" alt="{{ user.username }} profile picture">
+    {% else %}
+      <div class="profile-placeholder" aria-hidden="true">{{ (user.username | default("?"))[:1] }}</div>
+    {% endif %}
+    <div>
+      <h2>{{ user.username | default("Your profile") }}</h2>
+      <p class="muted">This image is stored with your MongoDB user profile.</p>
+    </div>
+  </section>
+
+  <div class="grid two">
+    <label>
+      Username
+      <input name="username" value="{{ user.username | default('') }}" required>
+    </label>
+    <label>
+      Email
+      <input name="email" type="email" value="{{ user.email | default('') }}" required>
+    </label>
+    <label>
+      Age
+      <input name="age" type="number" min="18" value="{{ user.age | default('') }}" required>
+    </label>
+    <label>
+      Gender
+      <input name="gender" value="{{ user.gender | default('') }}" required>
+    </label>
+    <label>
+      Profile image
+      <input name="profile_image" type="file" accept="image/*">
+    </label>
+    <label>
+      Contact info
+      <input name="contact_info" value="{{ user.contact_info | default('') }}">
+    </label>
+  </div>
+
+  <div class="grid two">
+    <label>
+      New password
+      <input name="new_password" type="password" autocomplete="new-password">
+    </label>
+    <label>
+      Confirm new password
+      <input name="confirm_password" type="password" autocomplete="new-password">
+    </label>
+  </div>
+
+  <div class="question-list">
+    {% for item in user.questions %}
+      <label>
+        {{ loop.index }}. {{ item.question }}
+        <input name="answer_{{ loop.index }}" maxlength="10" value="{{ item.answer }}">
+      </label>
+    {% endfor %}
+  </div>
+
+  <button class="button primary" type="submit">Save settings</button>
 </form>
 {% endblock %}
