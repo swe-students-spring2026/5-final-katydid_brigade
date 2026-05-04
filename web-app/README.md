@@ -16,6 +16,9 @@ This directory contains the Python web application subsystem.
 - [`GET, POST /settings/puzzle-questions`](./app.py) - `puzzle_questions` compatibility redirect to setup
 - [`GET /users/<user_id>/profile-image`](./app.py) - `profile_image` MongoDB-backed profile image
 - [`GET /logout`](./app.py) - `logout` clear session and return to login
+
+
+
 1. login pg
 2. register pg
     - username/password
@@ -47,3 +50,10 @@ User:
 * username
 * password
 * email
+
+
+Potential Future Addition:
+* custom questions - allow ability to substitute with custom questions
+* implement direct messages with matches
+* change default questions (which is current kind bad) and potentially shorten to less questions
+* support longer answers
