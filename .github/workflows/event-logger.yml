@@ -1,4 +1,4 @@
-name: log github events
+name: Github Event Logger
 on:
   push:
     branches: [main, master, pipfile-experiment]

@@ -1,0 +1,32 @@
+services:
+  mongodb:
+    image: mongo:7
+    ports:
+      - "27017:27017"
+    volumes:
+      - mongo_data:/data/db
+
+  game-engine:
+    build: ./game-engine
+    ports:
+      - "8001:8000"
+    environment:
+      - PYTHONPATH=/app
+    depends_on:
+      - mongodb
+
+  web-app:
+    build: ./web-app
+    ports:
+      - "8000:8000"
+    environment:
+      - MONGO_URI=mongodb://mongodb:27017/
+      - DB_NAME=katydid_brigade
+      - GAME_ENGINE_URL=http://game-engine:8000
+      - SECRET_KEY=changeme
+    depends_on:
+      - mongodb
+      - game-engine
+
+volumes:
+  mongo_data:
