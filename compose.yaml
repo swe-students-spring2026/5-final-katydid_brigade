@@ -3,5 +3,22 @@ services:
     build: .
     ports:
       - "8000:8000"
-    environment:
-      FLASK_ENV: production
+    env_file:
+      - .env
+    volumes:
+      - ./web-app:/app/web-app
+    command: gunicorn --reload --bind 0.0.0.0:8000 app:app
+    depends_on:
+      - mongo
+      - game-engine
+
+  game-engine:
+    build: ./game-engine
+
+  mongo:
+    image: mongo:7
+    volumes:
+      - mongo-data:/data/db
+
+volumes:
+  mongo-data:
