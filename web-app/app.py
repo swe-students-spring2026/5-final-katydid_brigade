@@ -106,16 +106,24 @@ def create_app(test_config=None):
 
             engine_url = app.config["GAME_ENGINE_URL"]
 
+            question_answers = []
             for i, question in enumerate(SETUP_QUESTIONS, start=1):
                 answer = request.form.get(f"answer_{i}")
-                if not answer:
-                    continue
+                if answer:
+                    question_answers.append({"question": question, "answer": answer})
+
+            if len(question_answers) == len(SETUP_QUESTIONS):
                 try:
-                    puzzle_data = create_puzzle(engine_url, question=question, answer=answer)
+                    puzzle_data = create_puzzle(
+                        engine_url,
+                        question_answers=question_answers,
+                    )
                     db.puzzles.insert_one({
                         "owner_user_id": session["user_id"],
                         "question": puzzle_data["question"],
                         "answer": puzzle_data["answer"],
+                        "questions": puzzle_data["questions"],
+                        "answers": puzzle_data["answers"],
                         "board": puzzle_data["board"],
                         "max_attempts": puzzle_data["max_attempts"],
                     })
@@ -136,20 +144,30 @@ def create_app(test_config=None):
         ]), None)
             
         puzzles = list(db.puzzles.find({"owner_user_id": str(candidate["_id"])})) if candidate else []
+        puzzle = puzzles[0] if puzzles else None
+        if candidate and puzzle:
+            candidate["questions"] = [
+                {"question": question} for question in puzzle.get("questions", [])
+            ]
 
         if request.method == "POST":
             correct_count = 0
-            for i, puzzle in enumerate(puzzles, start=1):
+            answers = puzzle.get("answers", []) if puzzle else []
+            for i, _answer in enumerate(answers, start=1):
                 guess = request.form.get(f"answer_{i}")
                 previous_guesses = session.get(f"guesses_{i}", [])
 
-                outcome = requests.post(f"{engine_url}/guesses", json={
-                    "question": puzzle["question"],
-                    "answer": puzzle["answer"],
-                    "board": puzzle["board"],
-                    "guess": guess,
-                    "previous_guesses": previous_guesses,
-                }).json()
+                outcome = evaluate_guess(
+                    engine_url,
+                    question=puzzle["question"],
+                    answer=puzzle.get("answer"),
+                    questions=puzzle.get("questions", []),
+                    answers=answers,
+                    board=puzzle["board"],
+                    guess=guess,
+                    previous_guesses=previous_guesses,
+                    max_attempts=puzzle["max_attempts"],
+                )
 
                 session.setdefault(f"guesses_{i}", []).append(guess)
                 if outcome["is_correct"]:
@@ -157,11 +175,11 @@ def create_app(test_config=None):
 
             result = {
                 "score": correct_count,
-                "total": len(puzzles),
-                "matched": correct_count == len(puzzles),
+                "total": len(answers),
+                "matched": bool(answers) and correct_count == len(answers),
             }
 
-            if correct_count == len(puzzles) and candidate:
+            if result["matched"] and candidate:
                 db.matches.insert_one({
                     "solver_user_id": session.get("user_id"),
                     "target_user_id": str(candidate["_id"]),

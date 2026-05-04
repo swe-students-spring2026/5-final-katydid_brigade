@@ -30,6 +30,33 @@ def test_create_puzzle_endpoint() -> None:
     assert len(data["board"][0]) == 4
 
 
+def test_create_combined_puzzle_endpoint() -> None:
+    question_answers = [
+        {"question": "Favorite place?", "answer": "meadow"},
+        {"question": "Dream trip?", "answer": "forest"},
+        {"question": "Best hobby?", "answer": "garden"},
+        {"question": "Favorite view?", "answer": "harbor"},
+        {"question": "Favorite topic?", "answer": "planet"},
+        {"question": "Favorite color?", "answer": "silver"},
+        {"question": "Best season?", "answer": "autumn"},
+        {"question": "Nature word?", "answer": "branch"},
+        {"question": "Favorite spice?", "answer": "pepper"},
+        {"question": "Favorite flower?", "answer": "violet"},
+    ]
+
+    response = client.post(
+        "/puzzles",
+        json={"question_answers": question_answers, "seed": 12, "max_attempts": 5},
+    )
+
+    assert response.status_code == 200
+    data = response.json()
+    assert data["answer"] is None
+    assert len(data["questions"]) == 10
+    assert data["answers"] == [item["answer"] for item in question_answers]
+    assert len(data["board"]) == 10
+
+
 def test_evaluate_guess_endpoint() -> None:
     puzzle_response = client.post(
         "/puzzles",
@@ -49,6 +76,45 @@ def test_evaluate_guess_endpoint() -> None:
             "answer": puzzle_data["answer"],
             "board": puzzle_data["board"],
             "guess": "forest",
+            "previous_guesses": [],
+            "max_attempts": puzzle_data["max_attempts"],
+        },
+    )
+
+    assert response.status_code == 200
+    data = response.json()
+    assert data["is_correct"] is True
+    assert data["puzzle_solved"] is True
+
+
+def test_evaluate_combined_puzzle_guess_endpoint() -> None:
+    question_answers = [
+        {"question": "Favorite place?", "answer": "meadow"},
+        {"question": "Dream trip?", "answer": "forest"},
+        {"question": "Best hobby?", "answer": "garden"},
+        {"question": "Favorite view?", "answer": "harbor"},
+        {"question": "Favorite topic?", "answer": "planet"},
+        {"question": "Favorite color?", "answer": "silver"},
+        {"question": "Best season?", "answer": "autumn"},
+        {"question": "Nature word?", "answer": "branch"},
+        {"question": "Favorite spice?", "answer": "pepper"},
+        {"question": "Favorite flower?", "answer": "violet"},
+    ]
+    puzzle_response = client.post(
+        "/puzzles",
+        json={"question_answers": question_answers, "seed": 12, "max_attempts": 5},
+    )
+    puzzle_data = puzzle_response.json()
+
+    response = client.post(
+        "/guesses",
+        json={
+            "question": puzzle_data["question"],
+            "answer": puzzle_data["answer"],
+            "questions": puzzle_data["questions"],
+            "answers": puzzle_data["answers"],
+            "board": puzzle_data["board"],
+            "guess": "planet",
             "previous_guesses": [],
             "max_attempts": puzzle_data["max_attempts"],
         },

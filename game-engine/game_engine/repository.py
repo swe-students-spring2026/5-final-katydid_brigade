@@ -32,9 +32,11 @@ class PuzzleRecord:
 
     owner_user_id: str
     question: str
-    answer: str
+    answer: str | None
     board: list[list[str]]
     max_attempts: int
+    questions: list[str] | None = None
+    answers: list[str] | None = None
     puzzle_type: str = "boggle"
     created_at: datetime | None = None
     puzzle_id: Any | None = None
@@ -53,6 +55,8 @@ class PuzzleRecord:
             answer=puzzle.answer,
             board=[[cell for cell in row] for row in puzzle.board],
             max_attempts=puzzle.max_attempts,
+            questions=list(puzzle.questions),
+            answers=list(puzzle.answers),
             created_at=created_at or _utc_now(),
             puzzle_id=puzzle_id,
         )
@@ -62,6 +66,8 @@ class PuzzleRecord:
             "owner_user_id": self.owner_user_id,
             "question": self.question,
             "answer": self.answer,
+            "questions": self.questions or [],
+            "answers": self.answers or ([] if self.answer is None else [self.answer]),
             "board": self.board,
             "max_attempts": self.max_attempts,
             "puzzle_type": self.puzzle_type,
@@ -181,6 +187,8 @@ class MongoCompatibleGameRepository:
             answer=record.answer,
             board=record.board,
             max_attempts=record.max_attempts,
+            questions=record.questions,
+            answers=record.answers,
             puzzle_type=record.puzzle_type,
             created_at=record.created_at,
             puzzle_id=inserted.inserted_id,

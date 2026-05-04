@@ -2,6 +2,7 @@
 
 from .boggle import (
     BOARD_SIZE,
+    COMBINED_ANSWER_COUNT,
     MAX_ATTEMPTS,
     MAX_WORD_LENGTH,
     MIN_WORD_LENGTH,
@@ -9,7 +10,9 @@ from .boggle import (
     GuessResult,
     PuzzleSession,
     generate_boggle_board,
+    generate_combined_boggle_board,
     is_word_on_board,
+    normalize_answers,
     normalize_word,
 )
 from .repository import (
@@ -21,6 +24,7 @@ from .repository import (
 
 __all__ = [
     "BOARD_SIZE",
+    "COMBINED_ANSWER_COUNT",
     "MAX_ATTEMPTS",
     "MAX_WORD_LENGTH",
     "MIN_WORD_LENGTH",
@@ -28,7 +32,9 @@ __all__ = [
     "GuessResult",
     "PuzzleSession",
     "generate_boggle_board",
+    "generate_combined_boggle_board",
     "is_word_on_board",
+    "normalize_answers",
     "normalize_word",
     "AttemptRecord",
     "MatchRecord",

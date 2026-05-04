@@ -7,6 +7,7 @@ import random
 from typing import Iterable
 
 BOARD_SIZE = 4
+COMBINED_ANSWER_COUNT = 10
 MIN_WORD_LENGTH = 5
 MAX_WORD_LENGTH = 10
 MAX_ATTEMPTS = 5
@@ -39,14 +40,45 @@ def generate_boggle_board(answer: str, seed: int | None = None) -> tuple[tuple[s
     return tuple(tuple(row) for row in board)
 
 
+def generate_combined_boggle_board(
+    answers: Iterable[str],
+    seed: int | None = None,
+) -> tuple[tuple[str, ...], ...]:
+    """Create one board containing exactly 10 answer words.
+
+    A 4x4 board cannot reliably contain 10 arbitrary profile answers, so the
+    combined board uses one row per answer and keeps each answer traceable from
+    left to right.
+    """
+    normalized_answers = normalize_answers(answers)
+    rng = random.Random(seed)
+    columns = max(len(answer) for answer in normalized_answers)
+    board = []
+    for answer in normalized_answers:
+        row = list(answer)
+        row.extend(rng.choice(_FILLER_LETTERS) for _ in range(columns - len(answer)))
+        board.append(row)
+    return tuple(tuple(row) for row in board)
+
+
+def normalize_answers(answers: Iterable[str]) -> tuple[str, ...]:
+    """Validate and normalize the 10 answer words for a combined puzzle."""
+    normalized_answers = tuple(normalize_word(answer) for answer in answers)
+    if len(normalized_answers) != COMBINED_ANSWER_COUNT:
+        raise ValueError(f"Combined puzzles require exactly {COMBINED_ANSWER_COUNT} answers.")
+    if len(set(normalized_answers)) != len(normalized_answers):
+        raise ValueError("Combined puzzle answers must be unique.")
+    return normalized_answers
+
+
 def is_word_on_board(board: Iterable[Iterable[str]], word: str) -> bool:
     """Check whether a word can be traced on the Boggle board."""
     normalized_word = normalize_word(word)
     normalized_board = tuple(tuple(cell.lower() for cell in row) for row in board)
     _validate_board_shape(normalized_board)
 
-    for row in range(BOARD_SIZE):
-        for column in range(BOARD_SIZE):
+    for row in range(len(normalized_board)):
+        for column in range(len(normalized_board[row])):
             if normalized_board[row][column] != normalized_word[0]:
                 continue
             if _search_from_cell(
@@ -66,9 +98,11 @@ class BogglePuzzle:
     """A single daily puzzle tied to another user's answer."""
 
     question: str
-    answer: str
+    answer: str | None
     board: tuple[tuple[str, ...], ...]
     max_attempts: int = MAX_ATTEMPTS
+    questions: tuple[str, ...] = field(default_factory=tuple)
+    answers: tuple[str, ...] = field(default_factory=tuple)
 
     @classmethod
     def from_answer(
@@ -85,6 +119,34 @@ class BogglePuzzle:
             answer=normalized_answer,
             board=board,
             max_attempts=max_attempts,
+            questions=(question.strip(),),
+            answers=(normalized_answer,),
+        )
+
+    @classmethod
+    def from_question_answers(
+        cls,
+        question_answers: Iterable[tuple[str, str]],
+        seed: int | None = None,
+        max_attempts: int = MAX_ATTEMPTS,
+    ) -> "BogglePuzzle":
+        pairs = tuple((question.strip(), answer) for question, answer in question_answers)
+        if len(pairs) != COMBINED_ANSWER_COUNT:
+            raise ValueError(f"Combined puzzles require exactly {COMBINED_ANSWER_COUNT} questions.")
+
+        questions = tuple(question for question, _answer in pairs)
+        if any(not question for question in questions):
+            raise ValueError("Questions cannot be blank.")
+
+        answers = normalize_answers(answer for _question, answer in pairs)
+        board = generate_combined_boggle_board(answers, seed=seed)
+        return cls(
+            question="Combined profile puzzle",
+            answer=None,
+            board=board,
+            max_attempts=max_attempts,
+            questions=questions,
+            answers=answers,
         )
 
 
@@ -119,7 +181,10 @@ class PuzzleSession:
         self.guesses.append(normalized_guess)
 
         is_on_board = is_word_on_board(self.puzzle.board, normalized_guess)
-        is_correct = normalized_guess == self.puzzle.answer
+        correct_answers = self.puzzle.answers or (
+            (self.puzzle.answer,) if self.puzzle.answer else ()
+        )
+        is_correct = normalized_guess in correct_answers
         self.solved = is_correct
         attempts_used = len(self.guesses)
         attempts_remaining = self.puzzle.max_attempts - attempts_used
@@ -143,10 +208,13 @@ class PuzzleSession:
 
 
 def _validate_board_shape(board: tuple[tuple[str, ...], ...]) -> None:
-    if len(board) != BOARD_SIZE:
-        raise ValueError(f"Board must have {BOARD_SIZE} rows.")
-    if any(len(row) != BOARD_SIZE for row in board):
-        raise ValueError(f"Board must have {BOARD_SIZE} columns.")
+    if not board:
+        raise ValueError("Board must have at least one row.")
+    column_count = len(board[0])
+    if column_count == 0:
+        raise ValueError("Board must have at least one column.")
+    if any(len(row) != column_count for row in board):
+        raise ValueError("Board rows must all have the same number of columns.")
 
 
 def _build_random_path(
@@ -187,6 +255,15 @@ def _walk_path(
 
 
 def _neighbors(row: int, column: int) -> list[tuple[int, int]]:
+    return _neighbors_for_shape(BOARD_SIZE, BOARD_SIZE, row, column)
+
+
+def _neighbors_for_shape(
+    row_count: int,
+    column_count: int,
+    row: int,
+    column: int,
+) -> list[tuple[int, int]]:
     cells = []
     for row_offset in (-1, 0, 1):
         for column_offset in (-1, 0, 1):
@@ -194,7 +271,7 @@ def _neighbors(row: int, column: int) -> list[tuple[int, int]]:
                 continue
             next_row = row + row_offset
             next_column = column + column_offset
-            if 0 <= next_row < BOARD_SIZE and 0 <= next_column < BOARD_SIZE:
+            if 0 <= next_row < row_count and 0 <= next_column < column_count:
                 cells.append((next_row, next_column))
     return cells
 
@@ -210,7 +287,7 @@ def _search_from_cell(
     if index == len(word) - 1:
         return True
 
-    for next_row, next_column in _neighbors(row, column):
+    for next_row, next_column in _neighbors_for_shape(len(board), len(board[0]), row, column):
         if (next_row, next_column) in visited:
             continue
         if board[next_row][next_column] != word[index + 1]:

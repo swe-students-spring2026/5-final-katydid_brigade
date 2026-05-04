@@ -3,6 +3,7 @@ from game_engine import (
     BogglePuzzle,
     PuzzleSession,
     generate_boggle_board,
+    generate_combined_boggle_board,
     is_word_on_board,
     normalize_word,
 )
@@ -25,6 +26,27 @@ def test_generate_boggle_board_contains_answer() -> None:
     assert len(board) == 4
     assert all(len(row) == 4 for row in board)
     assert is_word_on_board(board, "garden")
+
+
+def test_generate_combined_boggle_board_contains_10_answers() -> None:
+    answers = [
+        "meadow",
+        "forest",
+        "garden",
+        "harbor",
+        "planet",
+        "silver",
+        "autumn",
+        "branch",
+        "pepper",
+        "violet",
+    ]
+
+    board = generate_combined_boggle_board(answers, seed=7)
+
+    assert len(board) == 10
+    assert all(len(row) == 6 for row in board)
+    assert all(is_word_on_board(board, answer) for answer in answers)
 
 
 def test_is_word_on_board_requires_non_reused_path() -> None:
@@ -53,6 +75,30 @@ def test_session_marks_match_on_correct_guess() -> None:
     assert result.puzzle_solved is True
     assert result.attempts_used == 1
     assert result.attempts_remaining == 4
+
+
+def test_session_accepts_any_answer_from_combined_puzzle() -> None:
+    question_answers = [
+        ("Favorite place?", "meadow"),
+        ("Dream trip?", "forest"),
+        ("Best hobby?", "garden"),
+        ("Favorite view?", "harbor"),
+        ("Favorite topic?", "planet"),
+        ("Favorite color?", "silver"),
+        ("Best season?", "autumn"),
+        ("Nature word?", "branch"),
+        ("Favorite spice?", "pepper"),
+        ("Favorite flower?", "violet"),
+    ]
+    puzzle = BogglePuzzle.from_question_answers(question_answers, seed=9)
+    session = PuzzleSession(puzzle=puzzle)
+
+    result = session.submit_guess("planet")
+
+    assert puzzle.answer is None
+    assert len(puzzle.answers) == 10
+    assert result.is_correct is True
+    assert result.puzzle_solved is True
 
 
 def test_session_tracks_incorrect_guess_that_is_not_on_board() -> None:
