@@ -7,7 +7,7 @@ from pymongo import MongoClient
 
 @pytest.fixture()
 def client():
-    app, socketio = create_app(test_config=TestConfig)
+    app = create_app(test_config=TestConfig)
     with app.test_client() as c:
         yield c
 
