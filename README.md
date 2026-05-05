@@ -1,7 +1,9 @@
-[![Tests](https://github.com/swe-students-spring2026/5-final-katydid_brigade/actions/workflows/tests.yml/badge.svg)](https://github.com/swe-students-spring2026/5-final-katydid_brigade/actions/workflows/tests.yml)
+# Most Puzzling
+
+[![Game Engine CI/CD](https://github.com/swe-students-spring2026/5-final-katydid_brigade/actions/workflows/game-engine.yml/badge.svg)](https://github.com/swe-students-spring2026/5-final-katydid_brigade/actions/workflows/game-engine.yml)
+[![Web App CI/CD](https://github.com/swe-students-spring2026/5-final-katydid_brigade/actions/workflows/web-app.yml/badge.svg)](https://github.com/swe-students-spring2026/5-final-katydid_brigade/actions/workflows/web-app.yml)
 [![Event Logger](https://github.com/swe-students-spring2026/5-final-katydid_brigade/actions/workflows/event-logger.yml/badge.svg)](https://github.com/swe-students-spring2026/5-final-katydid_brigade/actions/workflows/event-logger.yml)
 
-# Most Puzzling
 
 Most Puzzling is a boggle word game where users answer a set of questions designed by other players, and if their responses match with another user's answers, the two get connected.
 
