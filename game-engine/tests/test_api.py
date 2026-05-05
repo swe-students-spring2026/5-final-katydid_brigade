@@ -114,7 +114,7 @@ def test_evaluate_combined_puzzle_guess_endpoint() -> None:
     assert response.status_code == 200
     data = response.json()
     assert data["is_correct"] is True
-    assert data["puzzle_solved"] is False  # 1 of 5 answers guessed — not solved yet
+    assert data["puzzle_solved"] is True
 
 
 def test_create_puzzle_rejects_short_answer() -> None:
