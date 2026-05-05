@@ -22,6 +22,7 @@ BoggleBond is a boggle word game where users answer a set of questions designed 
 - [Chen Chen](https://github.com/LoganHund)
 - [Chenyu (Ginny) Jiang](https://github.com/ginny1536)
 - [Bryce](https://github.com/blin03)
+- [Ani Guduru] (https://github.com/AniGuduru)
 
 ## Running the Project
 
