@@ -274,16 +274,8 @@ def create_app(test_config=None):
             try:
                 save_question_puzzles()
             except Exception as error:
-                flash(f"Puzzle could not be generated: {error}")
-                user = attach_profile_questions(get_current_user() or {})
-                user["questions"] = [
-                    {
-                        "question": question,
-                        "answer": request.form.get(f"answer_{i}") or "",
-                    }
-                    for i, question in enumerate(SETUP_QUESTIONS, start=1)
-                ]
-                return render_template("setup.html", user=user), 400
+                flash(f"Answers saved, but puzzle could not be generated: {error}")
+            return redirect(url_for("dashboard"))
 
             return redirect(url_for("dashboard"))
         user = attach_profile_questions(get_current_user() or {})
