@@ -3,6 +3,12 @@
 import itertools
 import random
 from datetime import date
+from flask import Flask, flash, jsonify, redirect, render_template, request, session, url_for
+from flask_socketio import SocketIO, emit, join_room
+from datetime import datetime
+from game_engine_client import evaluate_guess, create_puzzle
+from pymongo import MongoClient
+from bson.objectid import ObjectId
 
 from bson.errors import InvalidId
 from bson.objectid import ObjectId
@@ -14,6 +20,8 @@ from pymongo import MongoClient
 
 def create_app(test_config=None):
     app = Flask(__name__)
+    socketio = SocketIO(app, async_mode="eventlet", cors_allowed_origins="*")
+
 
     if test_config:
         if isinstance(test_config, dict):
@@ -572,10 +580,41 @@ def create_app(test_config=None):
         session.clear()
         return redirect(url_for("login"))
 
-    return app
+    @app.route("/matches/<match_id>/chat")
+    def chat(match_id):
+        if "user_id" not in session:
+            return redirect(url_for("login"))
+        try:
+            match = db.matches.find_one({"_id": ObjectId(match_id)})
+        except InvalidId:
+            match = None
+        if match is None:
+            return render_template("404.html"), 404
+        messages = list(db.messages.find({"match_id": match_id}))
+        return render_template("chat.html", match_id=match_id, messages=messages)
 
+    @socketio.on("send_message")
+    def handle_message(data):
+        match_id = data.get("match_id")
+        text = data.get("text")
+        sender_id = session.get("user_id")
+        msg = {
+            "match_id": match_id,
+            "sender_user_id": sender_id,
+            "text": text,
+            "sent_at": datetime.utcnow().isoformat(),
+        }
+        db.messages.insert_one(msg)
+        msg.pop("_id", None)
+        emit("receive_message", msg, to=match_id)
 
-app = create_app()
+    @socketio.on("join")
+    def on_join(data):
+        join_room(data["match_id"])
+
+    return app, socketio
+
+app, socketio = create_app()
 
 if __name__ == "__main__":
-    app.run(host="0.0.0.0", port=8000)
+    socketio.run(app, host="0.0.0.0", port=8000)
