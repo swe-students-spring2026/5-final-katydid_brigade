@@ -387,6 +387,7 @@ def create_app(test_config=None):
                     "status": "matched",
                     "matched_at": date.today().isoformat(),
                 })
+                return redirect(url_for("matches_page"))
         elif puzzle:
             result = {
                 "score": len(correct_guesses),
