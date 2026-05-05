@@ -50,6 +50,7 @@
           <option value="">Select gender</option>
           <option value="male" {% if user.gender == "male" %}selected{% endif %}>Male</option>
           <option value="female" {% if user.gender == "female" %}selected{% endif %}>Female</option>
+          <option value="nonbinary" {% if user.gender == "nonbinary" %}selected{% endif %}>Non-Binary</option>
         </select>
       </label>
       <label>
@@ -65,7 +66,7 @@
       {% for item in user.questions %}
         <label>
           {{ loop.index }}. {{ item.question }}
-          <input name="answer_{{ loop.index }}" minlength="5" maxlength="10" pattern="[A-Za-z]+" value="{{ item.answer }}">
+          <input name="answer_{{ loop.index }}" minlength="2" maxlength="10" pattern="[A-Za-z]+" value="{{ item.answer }}">
         </label>
       {% endfor %}
     </div>

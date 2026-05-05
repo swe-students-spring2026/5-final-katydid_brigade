@@ -1,13 +1,16 @@
-[![Tests](https://github.com/swe-students-spring2026/5-final-katydid_brigade/actions/workflows/tests.yml/badge.svg)](https://github.com/swe-students-spring2026/5-final-katydid_brigade/actions/workflows/tests.yml)
+# Most Puzzling
+
+[![Game Engine CI/CD](https://github.com/swe-students-spring2026/5-final-katydid_brigade/actions/workflows/game-engine.yml/badge.svg)](https://github.com/swe-students-spring2026/5-final-katydid_brigade/actions/workflows/game-engine.yml)
+[![Web App CI/CD](https://github.com/swe-students-spring2026/5-final-katydid_brigade/actions/workflows/web-app.yml/badge.svg)](https://github.com/swe-students-spring2026/5-final-katydid_brigade/actions/workflows/web-app.yml)
 [![Event Logger](https://github.com/swe-students-spring2026/5-final-katydid_brigade/actions/workflows/event-logger.yml/badge.svg)](https://github.com/swe-students-spring2026/5-final-katydid_brigade/actions/workflows/event-logger.yml)
 
-# Most Puzzling
 
 Most Puzzling is a boggle word game where users answer a set of questions designed by other players, and if their responses match with another user's answers, the two get connected.
 
 ## Container Images
 
-- Needs to be added after finishing developing
+- [Game Engine](https://hub.docker.com/r/g1nny2470/bogglebond-game-engine) — Python service that generates boggle word puzzles from user generated information
+- [Web App](https://hub.docker.com/r/g1nny2470/bogglebond-web-app) — Flask web application that handles user registration, profile setup, puzzle gameplay, and matchmaking
 
 ## Team Member
 
@@ -21,14 +24,35 @@ Most Puzzling is a boggle word game where users answer a set of questions design
 ### Requirements
 
 - [Docker](https://www.docker.com/get-started) and Docker Compose installed
+- A [MongoDB Atlas](https://www.mongodb.com/atlas) account with a free cluster (Remember to save your user credentials)
 
 ### 1. Clone the repository
 
 ```sh
 git clone https://github.com/swe-students-spring2026/5-final-katydid_brigade.git
+cd 5-final-katydid_brigade
 ```
 
-### 2. Build and start all containers
+### 2. Set up environment variables
+
+Copy the example env file and fill in your values:
+
+```sh
+cp .env.example .env
+```
+
+Open `.env` and set:
+
+- `MONGO_URI` — your Atlas connection string (see below)
+- `SECRET_KEY` — any random secret string
+
+**Getting your Atlas connection string:**
+1. Go to your Atlas cluster → **Connect** → **Drivers**
+2. Copy the `mongodb+srv://...` URI
+3. Replace `<username>` and `<password>` with your Atlas database user credentials 
+4. If your password contains special characters (e.g. `>`, `@`, `:`), percent-encode them (e.g. `>` → `%3E`)
+
+### 3. Build and start all containers
 
 ```sh
 docker compose up --build
@@ -36,24 +60,17 @@ docker compose up --build
 
 Then open http://localhost:8000.
 
-### 3. Stop the app 
+### 4. Stop the app
 
 ```sh
 docker compose down
 ```
 
-You can also build and run without Compose:
-
-```sh
-docker build -t katydid-web-app .
-docker run --rm -p 8000:8000 katydid-web-app
-```
-
 ## Environment Variables
 
-| Variable | Default | Description |
-|----------|---------|-------------|
-| `MONGO_URI` | `mongodb://mongodb:27017/` | MongoDB connection string |
-| `DB_NAME` | `katydid_brigade` | MongoDB database name |
-| `GAME_ENGINE_URL` | `http://game-engine:8000` | Internal URL of the game engine |
-| `SECRET_KEY` | `changeme` | Flask session secret key — change in production |
+| Variable | Description |
+|----------|-------------|
+| `MONGO_URI` | MongoDB Atlas connection string (`mongodb+srv://user:pass@cluster.mongodb.net/`) |
+| `DB_NAME` | MongoDB database name (default: `katydid_brigade`) |
+| `GAME_ENGINE_URL` | Internal URL of the game engine (default: `http://game-engine:8000`) |
+| `SECRET_KEY` | Flask session secret — use a long random string in production |
