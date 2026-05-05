@@ -91,6 +91,26 @@ def test_session_accepts_any_answer_from_combined_puzzle() -> None:
     assert puzzle.answer is None
     assert len(puzzle.answers) == 5
     assert result.is_correct is True
+    assert result.puzzle_solved is False  # 1 of 5 answers guessed — not solved yet
+
+
+def test_session_solves_combined_puzzle_after_all_answers_guessed() -> None:
+    question_answers = [
+        ("Favorite place?", "stone"),
+        ("Dream trip?", "tones"),
+        ("Best hobby?", "notes"),
+        ("Favorite view?", "onset"),
+        ("Favorite topic?", "scent"),
+    ]
+    puzzle = BogglePuzzle.from_question_answers(question_answers, seed=9)
+    session = PuzzleSession(puzzle=puzzle)
+
+    session.submit_guess("stone")
+    session.submit_guess("tones")
+    session.submit_guess("notes")
+    session.submit_guess("onset")
+    result = session.submit_guess("scent")
+
     assert result.puzzle_solved is True
 
 
