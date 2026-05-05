@@ -1,19 +1,10 @@
 services:
-  mongodb:
-    image: mongo:7
-    ports:
-      - "27017:27017"
-    volumes:
-      - mongo_data:/data/db
-
   game-engine:
     build: ./game-engine
     ports:
       - "8001:8000"
     environment:
       - PYTHONPATH=/app
-    depends_on:
-      - mongodb
 
   web-app:
     build: ./web-app
@@ -22,14 +13,10 @@ services:
     volumes:
       - ./web-app:/app
     environment:
-      - MONGO_URI=mongodb://mongodb:27017/
+      - MONGO_URI=${MONGO_URI}
       - DB_NAME=katydid_brigade
       - GAME_ENGINE_URL=http://game-engine:8000
-      - SECRET_KEY=changeme
+      - SECRET_KEY=${SECRET_KEY}
       - FLASK_DEBUG=1
     depends_on:
-      - mongodb
       - game-engine
-
-volumes:
-  mongo_data:
