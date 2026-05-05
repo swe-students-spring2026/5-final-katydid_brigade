@@ -77,7 +77,7 @@ def create_puzzle(payload: CreatePuzzleRequest) -> PuzzleResponse:
                 max_attempts=payload.max_attempts,
             )
         else:
-            raise ValueError("Provide either one question and answer, or 10 question_answers.")
+            raise ValueError("Provide either one question and answer, or 5 question_answers.")
     except ValueError as error:
         raise HTTPException(status_code=400, detail=str(error)) from error
 

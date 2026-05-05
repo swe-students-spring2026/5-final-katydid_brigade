@@ -7,7 +7,10 @@ import random
 from typing import Iterable
 
 BOARD_SIZE = 4
-COMBINED_ANSWER_COUNT = 10
+COMBINED_ANSWER_COUNT = 5
+COMBINED_BOARD_SIZE = 5
+COMBINED_BOARD_ATTEMPTS = 500
+WORD_PLACEMENT_ATTEMPTS = 500
 MIN_WORD_LENGTH = 5
 MAX_WORD_LENGTH = 10
 MAX_ATTEMPTS = 5
@@ -44,25 +47,32 @@ def generate_combined_boggle_board(
     answers: Iterable[str],
     seed: int | None = None,
 ) -> tuple[tuple[str, ...], ...]:
-    """Create one board containing exactly 10 answer words.
-
-    A 4x4 board cannot reliably contain 10 arbitrary profile answers, so the
-    combined board uses one row per answer and keeps each answer traceable from
-    left to right.
-    """
+    """Create one 5x5 board containing exactly 5 scattered answer words."""
     normalized_answers = normalize_answers(answers)
     rng = random.Random(seed)
-    columns = max(len(answer) for answer in normalized_answers)
-    board = []
-    for answer in normalized_answers:
-        row = list(answer)
-        row.extend(rng.choice(_FILLER_LETTERS) for _ in range(columns - len(answer)))
-        board.append(row)
-    return tuple(tuple(row) for row in board)
+
+    for _attempt in range(COMBINED_BOARD_ATTEMPTS):
+        board: list[list[str | None]] = [
+            [None for _column in range(COMBINED_BOARD_SIZE)]
+            for _row in range(COMBINED_BOARD_SIZE)
+        ]
+        shuffled_answers = list(normalized_answers)
+        rng.shuffle(shuffled_answers)
+
+        if all(_place_word_on_board(board, answer, rng) for answer in shuffled_answers):
+            return tuple(
+                tuple(cell or rng.choice(_FILLER_LETTERS) for cell in row)
+                for row in board
+            )
+
+    raise RuntimeError(
+        "Could not fit all 5 answers on a 5x5 Boggle board. "
+        "Try shorter answers or answers with more shared letters."
+    )
 
 
 def normalize_answers(answers: Iterable[str]) -> tuple[str, ...]:
-    """Validate and normalize the 10 answer words for a combined puzzle."""
+    """Validate and normalize the answer words for a combined puzzle."""
     normalized_answers = tuple(normalize_word(answer) for answer in answers)
     if len(normalized_answers) != COMBINED_ANSWER_COUNT:
         raise ValueError(f"Combined puzzles require exactly {COMBINED_ANSWER_COUNT} answers.")
@@ -274,6 +284,67 @@ def _neighbors_for_shape(
             if 0 <= next_row < row_count and 0 <= next_column < column_count:
                 cells.append((next_row, next_column))
     return cells
+
+
+def _place_word_on_board(
+    board: list[list[str | None]],
+    word: str,
+    rng: random.Random,
+) -> bool:
+    row_count = len(board)
+    column_count = len(board[0])
+    starts = [
+        (row, column)
+        for row in range(row_count)
+        for column in range(column_count)
+    ]
+
+    for _attempt in range(WORD_PLACEMENT_ATTEMPTS):
+        rng.shuffle(starts)
+        for start in starts:
+            path = _build_path_for_word(board, word, rng, [start], {start}, 0)
+            if path is None:
+                continue
+            for (row, column), letter in zip(path, word):
+                board[row][column] = letter
+            return True
+    return False
+
+
+def _build_path_for_word(
+    board: list[list[str | None]],
+    word: str,
+    rng: random.Random,
+    path: list[tuple[int, int]],
+    used: set[tuple[int, int]],
+    index: int,
+) -> list[tuple[int, int]] | None:
+    row, column = path[-1]
+    cell = board[row][column]
+    if cell is not None and cell != word[index]:
+        return None
+    if index == len(word) - 1:
+        return path
+
+    neighbors = [
+        cell
+        for cell in _neighbors_for_shape(len(board), len(board[0]), row, column)
+        if cell not in used
+    ]
+    rng.shuffle(neighbors)
+
+    for next_cell in neighbors:
+        result = _build_path_for_word(
+            board,
+            word,
+            rng,
+            path + [next_cell],
+            used | {next_cell},
+            index + 1,
+        )
+        if result is not None:
+            return result
+    return None
 
 
 def _search_from_cell(

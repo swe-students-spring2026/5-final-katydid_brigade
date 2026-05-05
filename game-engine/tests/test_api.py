@@ -32,16 +32,11 @@ def test_create_puzzle_endpoint() -> None:
 
 def test_create_combined_puzzle_endpoint() -> None:
     question_answers = [
-        {"question": "Favorite place?", "answer": "meadow"},
-        {"question": "Dream trip?", "answer": "forest"},
-        {"question": "Best hobby?", "answer": "garden"},
-        {"question": "Favorite view?", "answer": "harbor"},
-        {"question": "Favorite topic?", "answer": "planet"},
-        {"question": "Favorite color?", "answer": "silver"},
-        {"question": "Best season?", "answer": "autumn"},
-        {"question": "Nature word?", "answer": "branch"},
-        {"question": "Favorite spice?", "answer": "pepper"},
-        {"question": "Favorite flower?", "answer": "violet"},
+        {"question": "Favorite place?", "answer": "stone"},
+        {"question": "Dream trip?", "answer": "tones"},
+        {"question": "Best hobby?", "answer": "notes"},
+        {"question": "Favorite view?", "answer": "onset"},
+        {"question": "Favorite topic?", "answer": "scent"},
     ]
 
     response = client.post(
@@ -52,9 +47,10 @@ def test_create_combined_puzzle_endpoint() -> None:
     assert response.status_code == 200
     data = response.json()
     assert data["answer"] is None
-    assert len(data["questions"]) == 10
+    assert len(data["questions"]) == 5
     assert data["answers"] == [item["answer"] for item in question_answers]
-    assert len(data["board"]) == 10
+    assert len(data["board"]) == 5
+    assert all(len(row) == len(data["board"]) for row in data["board"])
 
 
 def test_evaluate_guess_endpoint() -> None:
@@ -89,16 +85,11 @@ def test_evaluate_guess_endpoint() -> None:
 
 def test_evaluate_combined_puzzle_guess_endpoint() -> None:
     question_answers = [
-        {"question": "Favorite place?", "answer": "meadow"},
-        {"question": "Dream trip?", "answer": "forest"},
-        {"question": "Best hobby?", "answer": "garden"},
-        {"question": "Favorite view?", "answer": "harbor"},
-        {"question": "Favorite topic?", "answer": "planet"},
-        {"question": "Favorite color?", "answer": "silver"},
-        {"question": "Best season?", "answer": "autumn"},
-        {"question": "Nature word?", "answer": "branch"},
-        {"question": "Favorite spice?", "answer": "pepper"},
-        {"question": "Favorite flower?", "answer": "violet"},
+        {"question": "Favorite place?", "answer": "stone"},
+        {"question": "Dream trip?", "answer": "tones"},
+        {"question": "Best hobby?", "answer": "notes"},
+        {"question": "Favorite view?", "answer": "onset"},
+        {"question": "Favorite topic?", "answer": "scent"},
     ]
     puzzle_response = client.post(
         "/puzzles",
@@ -114,7 +105,7 @@ def test_evaluate_combined_puzzle_guess_endpoint() -> None:
             "questions": puzzle_data["questions"],
             "answers": puzzle_data["answers"],
             "board": puzzle_data["board"],
-            "guess": "planet",
+            "guess": "scent",
             "previous_guesses": [],
             "max_attempts": puzzle_data["max_attempts"],
         },

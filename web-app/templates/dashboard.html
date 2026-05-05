@@ -39,6 +39,17 @@
     {% endif %}
 
     <section class="puzzle-panel">
+      {% if puzzle.questions %}
+        <section class="found-words">
+          <h2>Clues</h2>
+          <div class="question-list">
+            {% for question in puzzle.questions %}
+              <p class="muted">{{ loop.index }}. {{ question }}</p>
+            {% endfor %}
+          </div>
+        </section>
+      {% endif %}
+
       <div class="boggle-board" style="--board-columns: {{ puzzle.board[0] | length }};">
         {% for row in puzzle.board %}
           {% for letter in row %}
