@@ -28,25 +28,23 @@ def test_generate_boggle_board_contains_answer() -> None:
     assert is_word_on_board(board, "garden")
 
 
-def test_generate_combined_boggle_board_contains_10_answers() -> None:
+def test_generate_combined_boggle_board_contains_5_answers() -> None:
     answers = [
-        "meadow",
-        "forest",
-        "garden",
-        "harbor",
-        "planet",
-        "silver",
-        "autumn",
-        "branch",
-        "pepper",
-        "violet",
+        "stone",
+        "tones",
+        "notes",
+        "onset",
+        "scent",
     ]
 
     board = generate_combined_boggle_board(answers, seed=7)
 
-    assert len(board) == 10
-    assert all(len(row) == 6 for row in board)
+    assert len(board) == 5
+    assert all(len(row) == len(board) for row in board)
     assert all(is_word_on_board(board, answer) for answer in answers)
+    assert [row[: len(answer)] for row, answer in zip(board, answers)] != [
+        tuple(answer) for answer in answers
+    ]
 
 
 def test_is_word_on_board_requires_non_reused_path() -> None:
@@ -79,24 +77,19 @@ def test_session_marks_match_on_correct_guess() -> None:
 
 def test_session_accepts_any_answer_from_combined_puzzle() -> None:
     question_answers = [
-        ("Favorite place?", "meadow"),
-        ("Dream trip?", "forest"),
-        ("Best hobby?", "garden"),
-        ("Favorite view?", "harbor"),
-        ("Favorite topic?", "planet"),
-        ("Favorite color?", "silver"),
-        ("Best season?", "autumn"),
-        ("Nature word?", "branch"),
-        ("Favorite spice?", "pepper"),
-        ("Favorite flower?", "violet"),
+        ("Favorite place?", "stone"),
+        ("Dream trip?", "tones"),
+        ("Best hobby?", "notes"),
+        ("Favorite view?", "onset"),
+        ("Favorite topic?", "scent"),
     ]
     puzzle = BogglePuzzle.from_question_answers(question_answers, seed=9)
     session = PuzzleSession(puzzle=puzzle)
 
-    result = session.submit_guess("planet")
+    result = session.submit_guess("scent")
 
     assert puzzle.answer is None
-    assert len(puzzle.answers) == 10
+    assert len(puzzle.answers) == 5
     assert result.is_correct is True
     assert result.puzzle_solved is True
 
