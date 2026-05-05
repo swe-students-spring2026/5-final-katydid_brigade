@@ -398,12 +398,31 @@ def create_app(test_config=None):
             except (InvalidId, TypeError):
                 continue
 
-        match_filter = {"_id": {"$in": puzzle_owner_ids}}
+        exclude_ids = []
         if current_user_id:
             try:
-                match_filter["_id"]["$ne"] = ObjectId(current_user_id)
+                exclude_ids.append(ObjectId(current_user_id))
             except InvalidId:
                 pass
+
+            matched_records = db.matches.find({
+                "$or": [
+                    {"solver_user_id": current_user_id},
+                    {"target_user_id": current_user_id},
+                ]
+            })
+            for m in matched_records:
+                other_id = (
+                    m.get("target_user_id")
+                    if m.get("solver_user_id") == current_user_id
+                    else m.get("solver_user_id")
+                )
+                try:
+                    exclude_ids.append(ObjectId(other_id))
+                except (InvalidId, TypeError):
+                    pass
+
+        match_filter = {"_id": {"$in": puzzle_owner_ids, "$nin": exclude_ids}}
 
         candidate = next(db.users.aggregate([
             {"$match": match_filter},

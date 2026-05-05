@@ -293,9 +293,58 @@ select:focus {
   margin: 24px 0;
 }
 
+.puzzle-layout {
+  align-items: start;
+  display: grid;
+  gap: 32px;
+  grid-template-columns: 1fr 260px;
+}
+
 .puzzle-panel {
   display: grid;
   gap: 24px;
+}
+
+.clues-panel {
+  display: grid;
+  gap: 0;
+}
+
+.clues-panel h2 {
+  font-size: 1.1rem;
+  margin: 0 0 12px;
+}
+
+.clue-item {
+  border-top: 1px solid var(--line);
+  padding: 10px 0;
+}
+
+.clue-item:last-child {
+  border-bottom: 1px solid var(--line);
+}
+
+.clue-question {
+  color: var(--muted);
+  font-size: 0.82rem;
+  font-weight: 700;
+  margin: 0 0 3px;
+}
+
+.clue-answer {
+  font-size: 0.95rem;
+  font-weight: 700;
+  margin: 0;
+  text-transform: uppercase;
+}
+
+.clue-answer.revealed {
+  color: var(--primary);
+}
+
+.clue-answer.hidden {
+  color: var(--line);
+  letter-spacing: 0.15em;
 }
 
 .boggle-board {
@@ -311,17 +360,45 @@ select:focus {
   background: #f2f5f7;
   border: 1px solid var(--line);
   border-radius: 6px;
+  cursor: pointer;
   display: flex;
   font-size: clamp(1rem, 2.8vw, 1.8rem);
   font-weight: 800;
   justify-content: center;
+  min-height: unset;
+  padding: 0;
   text-transform: uppercase;
+}
+
+.boggle-cell:hover {
+  background: #e4e9ef;
+  border-color: var(--primary);
+}
+
+.boggle-cell:active {
+  background: var(--line);
+}
+
+.boggle-cell--selected {
+  background: var(--primary);
+  border-color: var(--primary-dark);
+  color: #ffffff;
 }
 
 .puzzle-form {
   align-items: end;
   grid-template-columns: minmax(0, 1fr) auto;
   max-width: 620px;
+}
+
+.guess-row {
+  display: flex;
+  gap: 8px;
+}
+
+.guess-row input {
+  flex: 1;
+  min-width: 0;
 }
 
 .found-words {
@@ -493,6 +570,10 @@ select:focus {
   }
 
   .grid.two {
+    grid-template-columns: 1fr;
+  }
+
+  .puzzle-layout {
     grid-template-columns: 1fr;
   }
 

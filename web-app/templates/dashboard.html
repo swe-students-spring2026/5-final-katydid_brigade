@@ -38,56 +38,66 @@
       </section>
     {% endif %}
 
-    <section class="puzzle-panel">
-      {% if puzzle.questions %}
-        <section class="found-words">
-          <h2>Clues</h2>
-          <div class="question-list">
-            {% for question in puzzle.questions %}
-              <p class="muted">{{ loop.index }}. {{ question }}</p>
+    <div class="puzzle-layout">
+      <section class="puzzle-panel">
+        <div class="boggle-board" style="--board-columns: {{ puzzle.board[0] | length }};">
+          {% for row in puzzle.board %}
+            {% for letter in row %}
+              <button type="button" class="boggle-cell">{{ letter }}</button>
             {% endfor %}
-          </div>
-        </section>
-      {% endif %}
-
-      <div class="boggle-board" style="--board-columns: {{ puzzle.board[0] | length }};">
-        {% for row in puzzle.board %}
-          {% for letter in row %}
-            <span class="boggle-cell">{{ letter }}</span>
           {% endfor %}
-        {% endfor %}
-      </div>
+        </div>
 
-      <form method="post" class="form puzzle-form">
-        <label>
-          Guess a word
-          <input name="guess" minlength="5" maxlength="10" pattern="[A-Za-z]+" autocomplete="off" required>
-        </label>
-        <button class="button primary" type="submit">Submit guess</button>
-      </form>
+        <form method="post" class="form puzzle-form">
+          <label>
+            Guess a word
+            <div class="guess-row">
+              <input id="guess-input" name="guess" minlength="5" maxlength="10" pattern="[A-Za-z]+" autocomplete="off" required>
+              <button type="button" id="backspace-btn" class="button" title="Backspace">&#x232B;</button>
+            </div>
+          </label>
+          <button class="button primary" type="submit">Submit guess</button>
+        </form>
 
-      {% if correct_guesses %}
-        <section class="found-words">
-          <h2>Found words</h2>
-          <div class="word-list">
-            {% for guess in correct_guesses %}
-              <span>{{ guess }}</span>
-            {% endfor %}
-          </div>
-        </section>
+        {% if correct_guesses %}
+          <section class="found-words">
+            <h2>Found words</h2>
+            <div class="word-list">
+              {% for guess in correct_guesses %}
+                <span>{{ guess }}</span>
+              {% endfor %}
+            </div>
+          </section>
+        {% endif %}
+
+        {% if all_guesses %}
+          <section class="found-words">
+            <h2>Previous guesses</h2>
+            <div class="word-list muted">
+              {% for guess in all_guesses %}
+                <span>{{ guess }}</span>
+              {% endfor %}
+            </div>
+          </section>
+        {% endif %}
+      </section>
+
+      {% if puzzle.questions %}
+        <aside class="clues-panel">
+          <h2>Clues</h2>
+          {% for i in range(puzzle.questions | length) %}
+            <div class="clue-item">
+              <p class="clue-question">{{ puzzle.questions[i] }}</p>
+              {% if puzzle.answers[i].lower() in correct_guesses %}
+                <p class="clue-answer revealed">{{ puzzle.answers[i] }}</p>
+              {% else %}
+                <p class="clue-answer hidden"> 🔒 </p>
+              {% endif %}
+            </div>
+          {% endfor %}
+        </aside>
       {% endif %}
-
-      {% if all_guesses %}
-        <section class="found-words">
-          <h2>Previous guesses</h2>
-          <div class="word-list muted">
-            {% for guess in all_guesses %}
-              <span>{{ guess }}</span>
-            {% endfor %}
-          </div>
-        </section>
-      {% endif %}
-    </section>
+    </div>
   {% else %}
     <section class="notice">
       This profile does not have a generated puzzle yet.
@@ -98,4 +108,40 @@
     No puzzle-ready profiles are available yet.
   </section>
 {% endif %}
+{% endblock %}
+
+{% block scripts %}
+<script>
+  var input = document.getElementById('guess-input');
+  var selectedCells = [];
+
+  document.querySelectorAll('.boggle-cell').forEach(function(btn) {
+    btn.addEventListener('click', function() {
+      if (input.value.length < 10) {
+        input.value += btn.textContent.trim().toLowerCase();
+        selectedCells.push(btn);
+        btn.classList.add('boggle-cell--selected');
+        input.focus();
+      }
+    });
+  });
+
+  document.getElementById('backspace-btn').addEventListener('click', function() {
+    if (input.value.length > 0) {
+      input.value = input.value.slice(0, -1);
+      var last = selectedCells.pop();
+      if (last && !selectedCells.includes(last)) {
+        last.classList.remove('boggle-cell--selected');
+      }
+      input.focus();
+    }
+  });
+
+  document.querySelector('.puzzle-form').addEventListener('submit', function() {
+    document.querySelectorAll('.boggle-cell--selected').forEach(function(cell) {
+      cell.classList.remove('boggle-cell--selected');
+    });
+    selectedCells = [];
+  });
+</script>
 {% endblock %}
