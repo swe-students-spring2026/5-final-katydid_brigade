@@ -322,10 +322,17 @@ def create_app(test_config=None):
 
         match_filter = {"_id": {"$in": puzzle_owner_ids, "$nin": exclude_ids}}
 
-        candidate = next(db.users.aggregate([
-            {"$match": match_filter},
-            {"$sample": {"size": 1}},
-        ]), None)
+        candidate_id_from_form = request.form.get("candidate_id") if request.method == "POST" else None
+        if candidate_id_from_form:
+            try:
+                candidate = db.users.find_one({"_id": ObjectId(candidate_id_from_form)})
+            except (InvalidId, TypeError):
+                candidate = None
+        else:
+            candidate = next(db.users.aggregate([
+                {"$match": match_filter},
+                {"$sample": {"size": 1}},
+            ]), None)
 
         puzzles = list(db.puzzles.find({"owner_user_id": str(candidate["_id"])})) if candidate else []
         puzzle = puzzles[0] if puzzles else None
