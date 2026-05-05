@@ -65,7 +65,7 @@
       {% for item in user.questions %}
         <label>
           {{ loop.index }}. {{ item.question }}
-          <input name="answer_{{ loop.index }}" minlength="5" maxlength="10" pattern="[A-Za-z]+" value="{{ item.answer }}">
+          <input name="answer_{{ loop.index }}" minlength="2" maxlength="10" pattern="[A-Za-z]+" value="{{ item.answer }}">
         </label>
       {% endfor %}
     </div>
