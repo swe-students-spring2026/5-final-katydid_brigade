@@ -1,5 +1,7 @@
 """Flask Web app - backend for Word Game and Matchmaking"""
 
+import itertools
+import random
 from datetime import date
 
 from bson.errors import InvalidId
@@ -52,6 +54,7 @@ def create_app(test_config=None):
         "coffee",
         "puzzle",
     ]
+    PUZZLE_ANSWER_COUNT = 5
 
     # ------- shared helpers -------
     def get_current_user():
@@ -106,10 +109,28 @@ def create_app(test_config=None):
         if len(question_answers) != len(SETUP_QUESTIONS):
             raise ValueError("Enter all 10 puzzle answers before saving the puzzle.")
 
-        puzzle_data = create_puzzle(
-            engine_url,
-            question_answers=question_answers,
+        db.users.update_one(
+            {"_id": ObjectId(session["user_id"])},
+            {"$set": {"question_answers": question_answers}},
         )
+        puzzle_data = None
+        last_error = None
+        for selected_question_answers in iter_puzzle_question_answer_selections(question_answers):
+            try:
+                puzzle_data = create_puzzle(
+                    engine_url,
+                    question_answers=selected_question_answers,
+                )
+                break
+            except Exception as error:
+                last_error = error
+
+        if puzzle_data is None:
+            raise ValueError(
+                "Could not generate a 5x5 puzzle from any 5-answer selection. "
+                "Try answers with more shared letters."
+            ) from last_error
+
         db.puzzles.replace_one(
             {"owner_user_id": session["user_id"], "question": puzzle_data["question"]},
             {
@@ -125,6 +146,10 @@ def create_app(test_config=None):
         )
 
     def attach_profile_questions(user):
+        saved_question_answers = {
+            item.get("question"): item.get("answer", "")
+            for item in user.get("question_answers", [])
+        }
         combined_puzzle = db.puzzles.find_one({
             "owner_user_id": session["user_id"],
             "questions": {"$exists": True},
@@ -147,12 +172,27 @@ def create_app(test_config=None):
                 "question": question,
                 "answer": existing_answers.get(
                     question,
-                    existing_puzzles.get(question, {}).get("answer", ""),
+                    saved_question_answers.get(
+                        question,
+                        existing_puzzles.get(question, {}).get("answer", ""),
+                    ),
                 ),
             }
             for question in SETUP_QUESTIONS
         ]
         return user
+
+    def iter_puzzle_question_answer_selections(question_answers, seed=None):
+        rng = random.Random(seed)
+        selections = [
+            list(selection)
+            for selection in itertools.combinations(question_answers, PUZZLE_ANSWER_COUNT)
+        ]
+        rng.shuffle(selections)
+        return selections
+
+    def select_puzzle_question_answers(question_answers, seed=None):
+        return next(iter(iter_puzzle_question_answer_selections(question_answers, seed=seed)))
 
     def user_profile_for_match(match):
         user_id = session.get("user_id")
@@ -183,16 +223,18 @@ def create_app(test_config=None):
         ]
 
     def fallback_sample_puzzle():
-        max_length = max(len(answer) for answer in SAMPLE_ANSWERS)
         board = [
-            list(answer + ("e" * (max_length - len(answer))))
-            for answer in SAMPLE_ANSWERS
+            list("oynoy"),
+            list("ldeod"),
+            list("hesln"),
+            list("mikga"),
+            list("cowin"),
         ]
         return {
             "question": "Combined profile puzzle",
             "answer": None,
-            "questions": SETUP_QUESTIONS,
-            "answers": SAMPLE_ANSWERS,
+            "questions": SETUP_QUESTIONS[:PUZZLE_ANSWER_COUNT],
+            "answers": SAMPLE_ANSWERS[:PUZZLE_ANSWER_COUNT],
             "board": board,
             "max_attempts": 5,
         }
@@ -213,13 +255,23 @@ def create_app(test_config=None):
         else:
             sample_user_id = str(sample_user["_id"])
 
-        if db.puzzles.find_one({"owner_user_id": sample_user_id}):
+        existing_puzzle = db.puzzles.find_one({"owner_user_id": sample_user_id})
+        if (
+            existing_puzzle
+            and len(existing_puzzle.get("board", [])) == 5
+            and all(len(row) == 5 for row in existing_puzzle.get("board", []))
+            and len(existing_puzzle.get("answers", [])) == PUZZLE_ANSWER_COUNT
+            and set(existing_puzzle.get("answers", [])).issubset(set(SAMPLE_ANSWERS))
+        ):
             return
 
         try:
             puzzle_data = create_puzzle(
                 app.config["GAME_ENGINE_URL"],
-                question_answers=sample_question_answers(),
+                question_answers=select_puzzle_question_answers(
+                    sample_question_answers(),
+                    seed=1,
+                ),
             )
         except Exception:
             puzzle_data = fallback_sample_puzzle()
