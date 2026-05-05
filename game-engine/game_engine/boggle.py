@@ -195,8 +195,7 @@ class PuzzleSession:
             (self.puzzle.answer,) if self.puzzle.answer else ()
         )
         is_correct = normalized_guess in correct_answers
-        correct_so_far = set(g for g in self.guesses if g in correct_answers)
-        self.solved = len(correct_so_far) == len(correct_answers)
+        self.solved = is_correct
         attempts_used = len(self.guesses)
         attempts_remaining = self.puzzle.max_attempts - attempts_used
 
