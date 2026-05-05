@@ -3,12 +3,12 @@
   <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>{% block title %}PlaceHolder Name{% endblock %}</title>
+    <title>{% block title %}BoggleBond{% endblock %}</title>
     <link rel="stylesheet" href="{{ url_for('static', filename='styles.css') }}">
   </head>
   <body>
     <header class="site-header">
-      <a class="brand" href="{{ url_for('dashboard') if g.current_user else url_for('index') }}">PlaceHolder Name</a>
+      <a class="brand" href="{{ url_for('dashboard') if g.current_user else url_for('index') }}">BoggleBond</a>
       <nav class="nav">
         {% if g.current_user %}
           <a href="{{ url_for('dashboard') }}">Dashboard</a>
