@@ -1,9 +1,13 @@
 [tool.pytest.ini_options]
 minversion = "7.0"
-addopts = "-ra -q"
+addopts = "-ra -q -p no:cacheprovider"
 pythonpath = [
   "."
 ]
 testpaths = [
   "tests",
+]
+norecursedirs = [
+  ".pytest_cache",
+  "pytest-cache-files-*",
 ]

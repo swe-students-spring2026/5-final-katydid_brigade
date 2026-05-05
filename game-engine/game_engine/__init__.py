@@ -3,6 +3,7 @@
 from .boggle import (
     BOARD_SIZE,
     COMBINED_ANSWER_COUNT,
+    COMBINED_BOARD_SIZE,
     MAX_ATTEMPTS,
     MAX_WORD_LENGTH,
     MIN_WORD_LENGTH,
@@ -25,6 +26,7 @@ from .repository import (
 __all__ = [
     "BOARD_SIZE",
     "COMBINED_ANSWER_COUNT",
+    "COMBINED_BOARD_SIZE",
     "MAX_ATTEMPTS",
     "MAX_WORD_LENGTH",
     "MIN_WORD_LENGTH",

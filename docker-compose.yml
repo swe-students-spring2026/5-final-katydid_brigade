@@ -19,11 +19,14 @@ services:
     build: ./web-app
     ports:
       - "8000:8000"
+    volumes:
+      - ./web-app:/app
     environment:
       - MONGO_URI=mongodb://mongodb:27017/
       - DB_NAME=katydid_brigade
       - GAME_ENGINE_URL=http://game-engine:8000
       - SECRET_KEY=changeme
+      - FLASK_DEBUG=1
     depends_on:
       - mongodb
       - game-engine

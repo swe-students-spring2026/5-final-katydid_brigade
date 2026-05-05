@@ -1,42 +1,101 @@
 {% extends "base.html" %}
 
-{% block title %}Dashboard | Question Match{% endblock %}
+{% block title %}Dashboard | PlaceHolder Name{% endblock %}
 
 {% block content %}
 <section class="content-header">
   <p class="eyebrow">{{ today.strftime("%B %d, %Y") }}</p>
-  <h1>Daily challenge</h1>
-  <p class="muted">Guess all 10 answers correctly to unlock a match.</p>
+  <h1>Daily puzzle</h1>
+  <p class="muted">Find the hidden words on the board to unlock a match.</p>
 </section>
 
-{% if result %}
-  <section class="notice success">
-    <strong>{{ result.score }}/{{ result.total }} correct.</strong>
-    {% if result.matched %}
-      You matched. Their profile is now available in Matches.
+{% if candidate %}
+  <section class="profile-strip">
+    {% if profile_image_url(candidate) %}
+      <img src="{{ profile_image_url(candidate) }}" alt="{{ candidate.username }} profile picture">
     {% else %}
-      No match today. Come back tomorrow for a new challenge.
+      <div class="profile-placeholder" aria-hidden="true">{{ candidate.username[:1] }}</div>
     {% endif %}
+    <div>
+      <h2>{{ candidate.username }}</h2>
+      <p class="muted">Age {{ candidate.age }} - {{ candidate.gender }}</p>
+    </div>
+  </section>
+
+  {% if puzzle %}
+    {% if result %}
+      <section class="notice success">
+        <strong>{{ result.score }}/{{ result.total }} words found.</strong>
+        {% if result.matched %}
+          You matched. Their profile is now available in Matches.
+        {% endif %}
+      </section>
+    {% endif %}
+
+    {% if outcome %}
+      <section class="notice {% if outcome.is_correct %}success{% else %}error{% endif %}">
+        {{ outcome.message }}
+      </section>
+    {% endif %}
+
+    <section class="puzzle-panel">
+      {% if puzzle.questions %}
+        <section class="found-words">
+          <h2>Clues</h2>
+          <div class="question-list">
+            {% for question in puzzle.questions %}
+              <p class="muted">{{ loop.index }}. {{ question }}</p>
+            {% endfor %}
+          </div>
+        </section>
+      {% endif %}
+
+      <div class="boggle-board" style="--board-columns: {{ puzzle.board[0] | length }};">
+        {% for row in puzzle.board %}
+          {% for letter in row %}
+            <span class="boggle-cell">{{ letter }}</span>
+          {% endfor %}
+        {% endfor %}
+      </div>
+
+      <form method="post" class="form puzzle-form">
+        <label>
+          Guess a word
+          <input name="guess" minlength="5" maxlength="10" pattern="[A-Za-z]+" autocomplete="off" required>
+        </label>
+        <button class="button primary" type="submit">Submit guess</button>
+      </form>
+
+      {% if correct_guesses %}
+        <section class="found-words">
+          <h2>Found words</h2>
+          <div class="word-list">
+            {% for guess in correct_guesses %}
+              <span>{{ guess }}</span>
+            {% endfor %}
+          </div>
+        </section>
+      {% endif %}
+
+      {% if all_guesses %}
+        <section class="found-words">
+          <h2>Previous guesses</h2>
+          <div class="word-list muted">
+            {% for guess in all_guesses %}
+              <span>{{ guess }}</span>
+            {% endfor %}
+          </div>
+        </section>
+      {% endif %}
+    </section>
+  {% else %}
+    <section class="notice">
+      This profile does not have a generated puzzle yet.
+    </section>
+  {% endif %}
+{% else %}
+  <section class="notice">
+    No puzzle-ready profiles are available yet.
   </section>
 {% endif %}
-
-<section class="profile-strip">
-  <img src="{{ candidate.profile_pic }}" alt="{{ candidate.username }} profile picture">
-  <div>
-    <h2>{{ candidate.username }}</h2>
-    <p class="muted">Age {{ candidate.age }} · {{ candidate.gender }}</p>
-  </div>
-</section>
-
-<form method="post" class="form wide-form">
-  <div class="question-list">
-    {% for item in candidate.questions %}
-      <label>
-        {{ loop.index }}. {{ item.question }}
-        <input name="answer_{{ loop.index }}" maxlength="10" required>
-      </label>
-    {% endfor %}
-  </div>
-  <button class="button primary" type="submit">Submit answers</button>
-</form>
 {% endblock %}

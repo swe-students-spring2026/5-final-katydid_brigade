@@ -1,6 +1,6 @@
 {% extends "base.html" %}
 
-{% block title %}Matches | Question Match{% endblock %}
+{% block title %}Matches | PlaceHolder Name{% endblock %}
 
 {% block content %}
 <section class="content-header">
@@ -12,7 +12,11 @@
   <section class="card-grid">
     {% for match in matches %}
       <article class="match-card">
-        <img src="{{ match.profile_pic }}" alt="{{ match.username }} profile picture">
+        {% if profile_image_url(match) %}
+          <img src="{{ profile_image_url(match) }}" alt="{{ match.username }} profile picture">
+        {% else %}
+          <div class="profile-placeholder small" aria-hidden="true">{{ match.username[:1] }}</div>
+        {% endif %}
         <h2>{{ match.username }}</h2>
         <p class="muted">Age {{ match.age }} · {{ match.gender }}</p>
         <a class="button" href="{{ url_for('match_detail', match_id=match.id) }}">View details</a>
