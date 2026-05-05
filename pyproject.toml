@@ -2,10 +2,19 @@
 
 [tool.pytest.ini_options]
 minversion = "7.0" # minimum pytest version
-addopts = "-ra -q" # default pytest command line options
+addopts = "-ra -q -p no:cacheprovider" # default pytest command line options
 pythonpath = [
-  "."
+  "web-app",
+  "game-engine",
 ]
 testpaths = [
-    "tests",
+    "web-app/tests",
+    "game-engine/tests",
+]
+norecursedirs = [
+    ".git",
+    ".venv",
+    "venv",
+    ".pytest_cache",
+    "pytest-cache-files-*",
 ]

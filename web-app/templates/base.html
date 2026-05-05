@@ -3,18 +3,30 @@
   <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>{% block title %}Question Match{% endblock %}</title>
+    <title>{% block title %}PlaceHolder Name{% endblock %}</title>
     <link rel="stylesheet" href="{{ url_for('static', filename='styles.css') }}">
   </head>
   <body>
     <header class="site-header">
-      <a class="brand" href="{{ url_for('index') }}">Question Match</a>
+      <a class="brand" href="{{ url_for('dashboard') if g.current_user else url_for('index') }}">PlaceHolder Name</a>
       <nav class="nav">
-        <a href="{{ url_for('dashboard') }}">Dashboard</a>
-        <a href="{{ url_for('matches_page') }}">Matches</a>
-        <a href="{{ url_for('profile') }}">Profile</a>
-        <a href="{{ url_for('settings') }}">Settings</a>
-        <a href="{{ url_for('logout') }}">Logout</a>
+        {% if g.current_user %}
+          <a href="{{ url_for('dashboard') }}">Dashboard</a>
+          <a href="{{ url_for('matches_page') }}">Matches</a>
+          <a class="settings-button" href="{{ url_for('settings') }}" aria-label="Open settings">
+            <span>{{ g.current_user.username }}</span>
+            <span class="nav-avatar" aria-hidden="true">
+              {% if profile_image_url(g.current_user) %}
+                <img src="{{ profile_image_url(g.current_user) }}" alt="">
+              {% else %}
+                <span class="gear-icon">&#9881;</span>
+              {% endif %}
+            </span>
+          </a>
+        {% else %}
+          <a href="{{ url_for('login') }}">Login</a>
+          <a href="{{ url_for('register') }}">Register</a>
+        {% endif %}
       </nav>
     </header>
 

@@ -1,43 +1,79 @@
 {% extends "base.html" %}
 
-{% block title %}Profile Setup | Question Match{% endblock %}
+{% block title %}Profile Setup | PlaceHolder Name{% endblock %}
 
 {% block content %}
 <section class="content-header">
   <p class="eyebrow">Profile setup</p>
   <h1>Build your question set</h1>
-  <p class="muted">Answers are capped at 10 characters for the first version.</p>
+  <p class="muted">Enter 10 unique answers with 5-10 letters. Each puzzle randomly uses 5 of them.</p>
 </section>
 
-<form method="post" class="form wide-form">
-  <div class="grid two">
-    <label>
-      Age
-      <input name="age" type="number" min="18" required>
-    </label>
-    <label>
-      Gender
-      <input name="gender" required>
-    </label>
-    <label>
-      Profile picture URL
-      <input name="profile_pic" type="url" placeholder="https://...">
-    </label>
-    <label>
-      Contact info
-      <input name="contact_info" placeholder="Email, Discord, phone, etc.">
-    </label>
-  </div>
-
-  <div class="question-list">
-    {% for question in questions %}
-      <label>
-        {{ loop.index }}. {{ question }}
-        <input name="answer_{{ loop.index }}" maxlength="10" required>
-      </label>
+{% with messages = get_flashed_messages() %}
+  {% if messages %}
+    {% for message in messages %}
+      <section class="notice error">{{ message }}</section>
     {% endfor %}
-  </div>
+  {% endif %}
+{% endwith %}
 
-  <button class="button primary" type="submit">Save profile</button>
+<form method="post" class="form wide-form" enctype="multipart/form-data">
+  <section class="profile-strip">
+    <label class="profile-upload" aria-label="Choose profile image">
+      {% if profile_image_url(user) %}
+        <img src="{{ profile_image_url(user) }}" alt="{{ user.username }} profile picture">
+      {% else %}
+        <span class="profile-placeholder gear-placeholder" aria-hidden="true">&#9881;</span>
+      {% endif %}
+      <input name="profile_image" type="file" accept="image/*">
+    </label>
+    <div>
+      <h2>{{ user.username | default("Your profile") }}</h2>
+      <p class="muted">Click the circle to update your profile image.</p>
+    </div>
+  </section>
+
+  <section class="form-section">
+    <h2>Profile details</h2>
+    <div class="grid two">
+      <label>
+        Name
+        <input name="name" value="{{ user.name | default('') }}">
+      </label>
+      <label>
+        Age
+        <input name="age" type="number" min="18" value="{{ user.age | default('') }}" required>
+      </label>
+      <label>
+        Gender
+        <select name="gender" required>
+          <option value="">Select gender</option>
+          <option value="male" {% if user.gender == "male" %}selected{% endif %}>Male</option>
+          <option value="female" {% if user.gender == "female" %}selected{% endif %}>Female</option>
+        </select>
+      </label>
+      <label>
+        Contact info
+        <input name="contact_info" value="{{ user.contact_info | default('') }}" placeholder="Email, Discord, phone, etc.">
+      </label>
+    </div>
+  </section>
+
+  <section class="form-section">
+    <h2>Puzzle answers</h2>
+    <div class="question-list">
+      {% for item in user.questions %}
+        <label>
+          {{ loop.index }}. {{ item.question }}
+          <input name="answer_{{ loop.index }}" minlength="5" maxlength="10" pattern="[A-Za-z]+" value="{{ item.answer }}">
+        </label>
+      {% endfor %}
+    </div>
+  </section>
+
+  <div class="settings-actions">
+    <button class="button primary" type="submit">Save profile</button>
+    <a class="button" href="{{ url_for('settings') }}">Back to settings</a>
+  </div>
 </form>
 {% endblock %}

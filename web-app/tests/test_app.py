@@ -12,10 +12,11 @@ def client():
         yield c
 
 @pytest.fixture()
-def logged_in_client(client):
+def logged_in_client(client, db):
     """Client with a fake logged-in session."""
+    user_id = db.users.insert_one({"username": "session_user"}).inserted_id
     with client.session_transaction() as sess:
-        sess["user_id"] = str(ObjectId())
+        sess["user_id"] = str(user_id)
     return client
 
 @pytest.fixture()
@@ -25,6 +26,7 @@ def db():
     yield db
     db.users.delete_many({})
     db.matches.delete_many({})
+    db.puzzles.delete_many({})
     client.close()
 
 
@@ -73,13 +75,13 @@ def test_register_post_redirects_to_setup(client):
 
 
 def test_setup_post_redirects_to_dashboard(logged_in_client):
-    response = logged_in_client.post("/setup", data={"answer": "some answer"})
+    response = logged_in_client.post("/setup", data={"age": "22", "gender": "male"})
     assert response.status_code == 302
     assert "/dashboard" in response.headers["Location"]
 
 
-def test_logout_redirects_to_login(client):
-    response = client.get("/logout")
+def test_logout_redirects_to_login(logged_in_client):
+    response = logged_in_client.get("/logout")
     assert response.status_code == 302
     assert "/login" in response.headers["Location"]
 
@@ -89,16 +91,15 @@ def test_logout_redirects_to_login(client):
 # ---------------------------------------------------------------------------
 
 
-def test_dashboard_get_returns_200(client):
-    response = client.get("/dashboard")
+def test_dashboard_get_returns_200(logged_in_client):
+    response = logged_in_client.get("/dashboard")
     assert response.status_code == 200
 
 
-def test_dashboard_post_returns_result(client):
-    response = client.post("/dashboard", data={"guess": "meadow"})
+def test_dashboard_post_returns_result(logged_in_client):
+    response = logged_in_client.post("/dashboard", data={"guess": "meadow"})
     assert response.status_code == 200
-    # The template should render a result block when a POST was made
-    assert b"score" in response.data.lower() or response.status_code == 200
+    assert b"No puzzle-ready profiles" in response.data
 
 
 # ---------------------------------------------------------------------------
@@ -106,20 +107,25 @@ def test_dashboard_post_returns_result(client):
 # ---------------------------------------------------------------------------
 
 
-def test_matches_page_returns_200(client):
-    response = client.get("/matches")
+def test_matches_page_returns_200(logged_in_client):
+    response = logged_in_client.get("/matches")
     assert response.status_code == 200
 
 
-def test_match_detail_returns_200_for_existing_match(client, db):
-    result = db.matches.insert_one({"name": "test match"})
-    response = client.get(f"/matches/{result.inserted_id}")
+def test_match_detail_returns_200_for_existing_match(logged_in_client, db):
+    solver = db.users.find_one({"username": "session_user"})
+    target_id = db.users.insert_one({"username": "target_user"}).inserted_id
+    result = db.matches.insert_one({
+        "solver_user_id": str(solver["_id"]),
+        "target_user_id": str(target_id),
+    })
+    response = logged_in_client.get(f"/matches/{result.inserted_id}")
     assert response.status_code == 200
 
 
-def test_match_detail_returns_404_for_missing_match(client):
+def test_match_detail_returns_404_for_missing_match(logged_in_client):
     fake_id = str(ObjectId())
-    response = client.get(f"/matches/{fake_id}")
+    response = logged_in_client.get(f"/matches/{fake_id}")
     assert response.status_code == 404
 
 
@@ -128,21 +134,23 @@ def test_match_detail_returns_404_for_missing_match(client):
 # ---------------------------------------------------------------------------
 
 
-def test_profile_get_returns_200(client):
-    response = client.get("/profile")
+def test_profile_get_returns_200(logged_in_client):
+    response = logged_in_client.get("/profile")
+    assert response.status_code == 302
+    assert "/setting" in response.headers["Location"]
+
+
+def test_profile_post_returns_200(logged_in_client):
+    response = logged_in_client.post("/profile", data={"age": "22"})
+    assert response.status_code == 307
+    assert "/setting" in response.headers["Location"]
+
+
+def test_settings_get_returns_200(logged_in_client):
+    response = logged_in_client.get("/settings")
     assert response.status_code == 200
 
 
-def test_profile_post_returns_200(client):
-    response = client.post("/profile", data={"age": "22"})
-    assert response.status_code == 200
-
-
-def test_settings_get_returns_200(client):
-    response = client.get("/settings")
-    assert response.status_code == 200
-
-
-def test_settings_post_returns_200(client):
-    response = client.post("/settings", data={"email": "a@b.com"})
+def test_settings_post_returns_200(logged_in_client):
+    response = logged_in_client.post("/settings", data={"email": "a@b.com", "gender": "male"})
     assert response.status_code == 200

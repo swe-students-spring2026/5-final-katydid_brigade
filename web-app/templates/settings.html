@@ -1,30 +1,90 @@
 {% extends "base.html" %}
 
-{% block title %}Settings | Question Match{% endblock %}
+{% block title %}Settings | PlaceHolder Name{% endblock %}
 
 {% block content %}
 <section class="content-header">
   <h1>Settings</h1>
-  <p class="muted">Manage account security.</p>
+  <p class="muted">Manage your account and match profile.</p>
 </section>
 
 {% if saved %}
-  <section class="notice success">Password changed.</section>
+  <section class="notice success">Settings saved.</section>
 {% endif %}
 
-<form method="post" class="form">
-  <label>
-    Current password
-    <input name="current_password" type="password" autocomplete="current-password" required>
-  </label>
-  <label>
-    New password
-    <input name="new_password" type="password" autocomplete="new-password" required>
-  </label>
-  <label>
-    Confirm new password
-    <input name="confirm_password" type="password" autocomplete="new-password" required>
-  </label>
-  <button class="button primary" type="submit">Change password</button>
+<form method="post" class="form wide-form" enctype="multipart/form-data">
+  <section class="profile-strip">
+    <label class="profile-upload" aria-label="Choose profile image">
+      {% if profile_image_url(user) %}
+        <img src="{{ profile_image_url(user) }}" alt="{{ user.username }} profile picture">
+      {% else %}
+        <span class="profile-placeholder gear-placeholder" aria-hidden="true">&#9881;</span>
+      {% endif %}
+      <input name="profile_image" type="file" accept="image/*">
+    </label>
+    <div>
+      <h2>{{ user.username | default("Your account") }}</h2>
+      <p class="muted">Click the circle to update your profile image.</p>
+    </div>
+  </section>
+
+  <div class="grid two">
+    <label>
+      Username
+      <input name="username" value="{{ user.username | default('') }}" required>
+    </label>
+    <label>
+      Name
+      <input name="name" value="{{ user.name | default('') }}">
+    </label>
+    <label>
+      Email
+      <input name="email" type="email" value="{{ user.email | default('') }}" required>
+    </label>
+    <label>
+      Age
+      <input name="age" type="number" min="18" value="{{ user.age | default('') }}" required>
+    </label>
+    <label>
+      Gender
+      <select name="gender" required>
+        <option value="">Select gender</option>
+        <option value="male" {% if user.gender == "male" %}selected{% endif %}>Male</option>
+        <option value="female" {% if user.gender == "female" %}selected{% endif %}>Female</option>
+      </select>
+    </label>
+    <label>
+      Contact info
+      <input name="contact_info" value="{{ user.contact_info | default('') }}">
+    </label>
+  </div>
+
+  <div class="grid two">
+    <label class="password-label">
+      New password
+      <span class="password-control">
+        <input id="new-password" name="new_password" type="password" autocomplete="new-password">
+        <button class="button password-toggle" type="button" data-password-toggle="new-password">Show</button>
+      </span>
+    </label>
+  </div>
+
+  <div class="settings-actions">
+    <button class="button primary" type="submit">Save settings</button>
+    <a class="button" href="{{ url_for('setup') }}">Edit puzzle answers</a>
+    <a class="button danger" href="{{ url_for('logout') }}">Log out</a>
+  </div>
 </form>
+
+<script>
+  const passwordToggle = document.querySelector("[data-password-toggle]");
+  if (passwordToggle) {
+    passwordToggle.addEventListener("click", () => {
+      const input = document.getElementById(passwordToggle.dataset.passwordToggle);
+      const shouldShow = input.type === "password";
+      input.type = shouldShow ? "text" : "password";
+      passwordToggle.textContent = shouldShow ? "Hide" : "Show";
+    });
+  }
+</script>
 {% endblock %}
