@@ -2,7 +2,8 @@
 
 import itertools
 import random
-from datetime import date
+from datetime import date, datetime
+from flask_socketio import SocketIO, emit, join_room
 
 from bson.errors import InvalidId
 from bson.objectid import ObjectId
@@ -14,6 +15,7 @@ from pymongo import MongoClient
 
 def create_app(test_config=None):
     app = Flask(__name__)
+    socketio = SocketIO(app, async_mode="eventlet", cors_allowed_origins="*")
 
     if test_config:
         if isinstance(test_config, dict):
@@ -476,11 +478,240 @@ def create_app(test_config=None):
     def logout():
         session.clear()
         return redirect(url_for("login"))
+    
+    # ------- chat helpers -------
+    def format_timestamp(iso_string):
+        """Convert ISO timestamp to a human-readable relative time."""
+        try:
+            dt = datetime.fromisoformat(iso_string)
+            now = datetime.utcnow()
+            diff = now - dt
+            seconds = diff.total_seconds()
+            if seconds < 60:
+                return "just now"
+            elif seconds < 3600:
+                minutes = int(seconds // 60)
+                return f"{minutes} minute{'s' if minutes != 1 else ''} ago"
+            elif seconds < 86400:
+                hours = int(seconds // 3600)
+                return f"{hours} hour{'s' if hours != 1 else ''} ago"
+            else:
+                return dt.strftime("%b %d at %I:%M %p")
+        except Exception:
+            return iso_string
 
-    return app
+    def get_chat_partner(match):
+        """Given a match document, return the other user's info."""
+        user_id = session.get("user_id")
+        other_id = match.get("target_user_id")
+        if other_id == user_id:
+            other_id = match.get("solver_user_id")
+        try:
+            partner = db.users.find_one({"_id": ObjectId(other_id)})
+        except (InvalidId, TypeError):
+            partner = None
+        return partner
+
+    def enrich_messages(messages):
+        """Add sender username and formatted timestamp to each message."""
+        enriched = []
+        user_cache = {}
+        for msg in messages:
+            sender_id = msg.get("sender_user_id")
+            if sender_id not in user_cache:
+                try:
+                    user = db.users.find_one({"_id": ObjectId(sender_id)})
+                    user_cache[sender_id] = user.get("username", "Unknown") if user else "Unknown"
+                except Exception:
+                    user_cache[sender_id] = "Unknown"
+            enriched.append({
+                "text": msg.get("text", ""),
+                "sender_username": user_cache[sender_id],
+                "sender_user_id": sender_id,
+                "sent_at": msg.get("sent_at", ""),
+                "sent_at_display": format_timestamp(msg.get("sent_at", "")),
+                "is_mine": sender_id == session.get("user_id"),
+            })
+        return enriched
+
+    def validate_message(text):
+        """Validate a chat message before saving."""
+        if not text or not text.strip():
+            return False, "Message cannot be empty."
+        if len(text) > 500:
+            return False, "Message cannot exceed 500 characters."
+        return True, None
+
+    def get_match_messages(match_id, limit=50, skip=0):
+        """Fetch paginated messages for a match."""
+        messages = list(
+            db.messages.find({"match_id": match_id})
+            .sort("sent_at", 1)
+            .skip(skip)
+            .limit(limit)
+        )
+        return enrich_messages(messages)
+
+    def user_is_in_match(match):
+        """Check if the current user is part of this match."""
+        user_id = session.get("user_id")
+        return (
+            match.get("solver_user_id") == user_id
+            or match.get("target_user_id") == user_id
+        )
+
+    # ------- chat routes -------
+    @app.route("/matches/<match_id>/chat")
+    def chat(match_id):
+        """Main chat page for a match."""
+        try:
+            match = db.matches.find_one({"_id": ObjectId(match_id)})
+        except InvalidId:
+            match = None
+        if match is None:
+            return render_template("404.html"), 404
+        if not user_is_in_match(match):
+            return render_template("404.html"), 404
+
+        partner = get_chat_partner(match)
+        messages = get_match_messages(match_id)
+        total_messages = db.messages.count_documents({"match_id": match_id})
+
+        return render_template(
+            "chat.html",
+            match_id=match_id,
+            messages=messages,
+            partner=partner,
+            total_messages=total_messages,
+        )
+
+    @app.route("/matches/<match_id>/chat/history")
+    def chat_history(match_id):
+        """API endpoint to load older messages (pagination)."""
+        try:
+            match = db.matches.find_one({"_id": ObjectId(match_id)})
+        except InvalidId:
+            return {"error": "Match not found"}, 404
+        if match is None or not user_is_in_match(match):
+            return {"error": "Unauthorized"}, 403
+
+        skip = int(request.args.get("skip", 0))
+        limit = int(request.args.get("limit", 20))
+        messages = get_match_messages(match_id, limit=limit, skip=skip)
+        return {"messages": messages, "skip": skip, "limit": limit}
+
+    @app.route("/matches/<match_id>/chat/send", methods=["POST"])
+    def chat_send(match_id):
+        """HTTP fallback endpoint to send a message without WebSocket."""
+        try:
+            match = db.matches.find_one({"_id": ObjectId(match_id)})
+        except InvalidId:
+            return {"error": "Match not found"}, 404
+        if match is None or not user_is_in_match(match):
+            return {"error": "Unauthorized"}, 403
+
+        text = (request.form.get("text") or "").strip()
+        valid, error = validate_message(text)
+        if not valid:
+            return {"error": error}, 400
+
+        sender_id = session.get("user_id")
+        msg = {
+            "match_id": match_id,
+            "sender_user_id": sender_id,
+            "text": text,
+            "sent_at": datetime.utcnow().isoformat(),
+        }
+        db.messages.insert_one(msg)
+        return {"status": "ok"}
+
+    # ------- socketio events -------
+    @socketio.on("join")
+    def on_join(data):
+        """User joins a chat room for a specific match."""
+        match_id = data.get("match_id")
+        if not match_id:
+            return
+        join_room(match_id)
+        user_id = session.get("user_id")
+        try:
+            user = db.users.find_one({"_id": ObjectId(user_id)})
+            username = user.get("username", "Someone") if user else "Someone"
+        except Exception:
+            username = "Someone"
+        emit("user_joined", {"username": username, "match_id": match_id}, to=match_id)
+
+    @socketio.on("send_message")
+    def handle_message(data):
+        """Handle an incoming chat message from a client."""
+        match_id = data.get("match_id")
+        text = (data.get("text") or "").strip()
+        sender_id = session.get("user_id")
+
+        if not match_id or not sender_id:
+            emit("error", {"message": "Invalid session."})
+            return
+
+        valid, error = validate_message(text)
+        if not valid:
+            emit("error", {"message": error})
+            return
+
+        try:
+            match = db.matches.find_one({"_id": ObjectId(match_id)})
+        except Exception:
+            emit("error", {"message": "Match not found."})
+            return
+
+        if match is None or not user_is_in_match(match):
+            emit("error", {"message": "You are not part of this match."})
+            return
+
+        try:
+            sender = db.users.find_one({"_id": ObjectId(sender_id)})
+            sender_username = sender.get("username", "Unknown") if sender else "Unknown"
+        except Exception:
+            sender_username = "Unknown"
+
+        msg = {
+            "match_id": match_id,
+            "sender_user_id": sender_id,
+            "sender_username": sender_username,
+            "text": text,
+            "sent_at": datetime.utcnow().isoformat(),
+        }
+        db.messages.insert_one(msg)
+        msg.pop("_id", None)
+        msg["sent_at_display"] = format_timestamp(msg["sent_at"])
+        msg["is_mine"] = False
+        emit("receive_message", msg, to=match_id)
+
+    @socketio.on("typing")
+    def handle_typing(data):
+        """Broadcast typing indicator to the other user in the chat room."""
+        match_id = data.get("match_id")
+        user_id = session.get("user_id")
+        if not match_id or not user_id:
+            return
+        try:
+            user = db.users.find_one({"_id": ObjectId(user_id)})
+            username = user.get("username", "Someone") if user else "Someone"
+        except Exception:
+            username = "Someone"
+        emit("user_typing", {"username": username}, to=match_id, include_self=False)
+
+    @socketio.on("stop_typing")
+    def handle_stop_typing(data):
+        """Broadcast stop typing indicator."""
+        match_id = data.get("match_id")
+        if not match_id:
+            return
+        emit("user_stopped_typing", {}, to=match_id, include_self=False)
+
+    return app, socketio
 
 
-app = create_app()
+app, socketio = create_app()
 
 if __name__ == "__main__":
-    app.run(host="0.0.0.0", port=8000)
+    socketio.run(app, host="0.0.0.0", port=8000)
