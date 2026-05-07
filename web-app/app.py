@@ -41,6 +41,21 @@ def create_app(test_config=None):
         "Coffee or tea?",
         "Favorite game?",
     ]
+    SAMPLE_USERNAME = "sample_match"
+    # TODO DEPLOYMENT: remove this hard-coded sample user and seeded puzzle.
+    # It exists only so local development always has a puzzle-ready profile.
+    SAMPLE_ANSWERS = [
+        "melody",
+        "island",
+        "hiking",
+        "noodle",
+        "comedy",
+        "algebra",
+        "sunrise",
+        "autumn",
+        "coffee",
+        "puzzle",
+    ]
     PUZZLE_ANSWER_COUNT = 5
 
     # ------- shared helpers -------
@@ -178,6 +193,9 @@ def create_app(test_config=None):
         rng.shuffle(selections)
         return selections
 
+    def select_puzzle_question_answers(question_answers, seed=None):
+        return next(iter(iter_puzzle_question_answer_selections(question_answers, seed=seed)))
+
     def user_profile_for_match(match):
         user_id = session.get("user_id")
         other_user_id = match.get("target_user_id")
@@ -200,6 +218,79 @@ def create_app(test_config=None):
         puzzle_id = str(puzzle["_id"])
         return f"puzzle_{puzzle_id}_correct", f"puzzle_{puzzle_id}_guesses"
 
+    def sample_question_answers():
+        return [
+            {"question": question, "answer": answer}
+            for question, answer in zip(SETUP_QUESTIONS, SAMPLE_ANSWERS)
+        ]
+
+    def fallback_sample_puzzle():
+        board = [
+            list("oynoy"),
+            list("ldeod"),
+            list("hesln"),
+            list("mikga"),
+            list("cowin"),
+        ]
+        return {
+            "question": "Combined profile puzzle",
+            "answer": None,
+            "questions": SETUP_QUESTIONS[:PUZZLE_ANSWER_COUNT],
+            "answers": SAMPLE_ANSWERS[:PUZZLE_ANSWER_COUNT],
+            "board": board,
+            "max_attempts": 5,
+        }
+
+    def ensure_sample_user():
+        sample_user = db.users.find_one({"username": SAMPLE_USERNAME})
+        if sample_user is None:
+            result = db.users.insert_one({
+                "username": SAMPLE_USERNAME,
+                "email": "sample@example.com",
+                "password": "password",
+                "name": "Sample Match",
+                "age": 24,
+                "gender": "female",
+                "contact_info": "sample@example.com",
+            })
+            sample_user_id = str(result.inserted_id)
+        else:
+            sample_user_id = str(sample_user["_id"])
+
+        existing_puzzle = db.puzzles.find_one({"owner_user_id": sample_user_id})
+        if (
+            existing_puzzle
+            and len(existing_puzzle.get("board", [])) == 5
+            and all(len(row) == 5 for row in existing_puzzle.get("board", []))
+            and len(existing_puzzle.get("answers", [])) == PUZZLE_ANSWER_COUNT
+            and set(existing_puzzle.get("answers", [])).issubset(set(SAMPLE_ANSWERS))
+        ):
+            return
+
+        try:
+            puzzle_data = create_puzzle(
+                app.config["GAME_ENGINE_URL"],
+                question_answers=select_puzzle_question_answers(
+                    sample_question_answers(),
+                    seed=1,
+                ),
+            )
+        except Exception:
+            puzzle_data = fallback_sample_puzzle()
+
+        db.puzzles.replace_one(
+            {"owner_user_id": sample_user_id, "question": puzzle_data["question"]},
+            {
+                "owner_user_id": sample_user_id,
+                "question": puzzle_data["question"],
+                "answer": puzzle_data.get("answer"),
+                "questions": puzzle_data["questions"],
+                "answers": puzzle_data["answers"],
+                "board": puzzle_data["board"],
+                "max_attempts": puzzle_data["max_attempts"],
+            },
+            upsert=True,
+        )
 
     # ------- request hooks -------
     @app.context_processor
@@ -208,6 +299,9 @@ def create_app(test_config=None):
 
     @app.before_request
     def require_login():
+        if not app.config.get("TESTING") and request.endpoint != "static":
+            ensure_sample_user()
+
         g.current_user = None
         user_id = session.get("user_id")
         if user_id:
@@ -276,8 +370,16 @@ def create_app(test_config=None):
             try:
                 save_question_puzzles()
             except Exception as error:
-                flash(f"Answers saved, but puzzle could not be generated: {error}")
-            return redirect(url_for("dashboard"))
+                flash(f"Puzzle could not be generated: {error}")
+                user = attach_profile_questions(get_current_user() or {})
+                user["questions"] = [
+                    {
+                        "question": question,
+                        "answer": request.form.get(f"answer_{i}") or "",
+                    }
+                    for i, question in enumerate(SETUP_QUESTIONS, start=1)
+                ]
+                return render_template("setup.html", user=user), 400
 
             return redirect(url_for("dashboard"))
         user = attach_profile_questions(get_current_user() or {})
@@ -324,17 +426,10 @@ def create_app(test_config=None):
 
         match_filter = {"_id": {"$in": puzzle_owner_ids, "$nin": exclude_ids}}
 
-        candidate_id_from_form = request.form.get("candidate_id") if request.method == "POST" else None
-        if candidate_id_from_form:
-            try:
-                candidate = db.users.find_one({"_id": ObjectId(candidate_id_from_form)})
-            except (InvalidId, TypeError):
-                candidate = None
-        else:
-            candidate = next(db.users.aggregate([
-                {"$match": match_filter},
-                {"$sample": {"size": 1}},
-            ]), None)
+        candidate = next(db.users.aggregate([
+            {"$match": match_filter},
+            {"$sample": {"size": 1}},
+        ]), None)
 
         puzzles = list(db.puzzles.find({"owner_user_id": str(candidate["_id"])})) if candidate else []
         puzzle = puzzles[0] if puzzles else None
@@ -387,7 +482,6 @@ def create_app(test_config=None):
                     "status": "matched",
                     "matched_at": date.today().isoformat(),
                 })
-                return redirect(url_for("matches_page"))
         elif puzzle:
             result = {
                 "score": len(correct_guesses),

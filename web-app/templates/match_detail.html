@@ -1,6 +1,6 @@
 {% extends "base.html" %}
 
-{% block title %}{{ match.username }} | BoggleBond{% endblock %}
+{% block title %}{{ match.username }} | PlaceHolder Name{% endblock %}
 
 {% block content %}
 <section class="profile-strip">
@@ -25,4 +25,5 @@
     </div>
   {% endfor %}
 </section>
+<a class="button" href="{{ url_for('chat', match_id=match.id) }}" style="margin-top:1rem; display:inline-block;">💬 Chat</a>
 {% endblock %}
