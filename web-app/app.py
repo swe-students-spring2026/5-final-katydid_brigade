@@ -701,6 +701,7 @@ def create_app(test_config=None):
             messages=messages,
             partner=partner,
             total_messages=total_messages,
+            current_user_id=session.get("user_id"),
         )
 
     @app.route("/matches/<match_id>/chat/history")

@@ -169,6 +169,22 @@ def test_match_detail_returns_200_for_existing_match(logged_in_client, db):
     assert response.status_code == 200
 
 
+def test_chat_page_returns_200_for_existing_match(logged_in_client, db):
+    solver = db.users.find_one({"username": "session_user"})
+    target_id = db.users.insert_one({"username": "target_user"}).inserted_id
+    result = db.matches.insert_one({
+        "solver_user_id": str(solver["_id"]),
+        "target_user_id": str(target_id),
+        "status": "matched",
+    })
+
+    response = logged_in_client.get(f"/matches/{result.inserted_id}/chat")
+
+    assert response.status_code == 200
+    assert b"target_user" in response.data
+    assert b"chat-form" in response.data
+
+
 def test_match_detail_returns_404_for_missing_match(logged_in_client):
     fake_id = str(ObjectId())
     response = logged_in_client.get(f"/matches/{fake_id}")

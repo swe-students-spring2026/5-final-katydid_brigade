@@ -1,0 +1,194 @@
+{% extends "base.html" %}
+
+{% block title %}Chat | BoggleBond{% endblock %}
+
+{% block content %}
+<section class="content-header chat-header">
+  <div>
+    <p class="eyebrow">Match chat</p>
+    <h1>{{ partner.username if partner else "Match" }}</h1>
+    <p class="muted">Send a message to keep the conversation going.</p>
+  </div>
+  <a class="button" href="{{ url_for('match_detail', match_id=match_id) }}">View profile</a>
+</section>
+
+<section class="chat-shell" data-match-id="{{ match_id }}" data-current-user-id="{{ current_user_id }}">
+  <div id="chat-messages" class="chat-messages" aria-live="polite">
+    {% if messages %}
+      {% for message in messages %}
+        <article class="chat-message {% if message.is_mine %}mine{% endif %}">
+          <div class="chat-message-meta">
+            <strong>{{ message.sender_username }}</strong>
+            <span>{{ message.sent_at_display }}</span>
+          </div>
+          <p>{{ message.text }}</p>
+        </article>
+      {% endfor %}
+    {% else %}
+      <p id="empty-chat" class="muted empty-chat">No messages yet.</p>
+    {% endif %}
+  </div>
+
+  <p id="typing-indicator" class="muted typing-indicator" hidden></p>
+
+  <form id="chat-form" class="chat-form">
+    <label class="sr-only" for="chat-input">Message</label>
+    <textarea id="chat-input" name="text" maxlength="500" rows="2" placeholder="Write a message..." required></textarea>
+    <button class="button primary" type="submit">Send</button>
+  </form>
+  <p id="chat-error" class="notice error" hidden></p>
+</section>
+{% endblock %}
+
+{% block scripts %}
+<script src="/socket.io/socket.io.js"></script>
+<script>
+  var shell = document.querySelector('.chat-shell');
+  var matchId = shell ? shell.dataset.matchId : '';
+  var currentUserId = shell ? shell.dataset.currentUserId : '';
+  var messages = document.getElementById('chat-messages');
+  var form = document.getElementById('chat-form');
+  var input = document.getElementById('chat-input');
+  var errorBox = document.getElementById('chat-error');
+  var typingIndicator = document.getElementById('typing-indicator');
+  var socket = window.io ? io() : null;
+  var typingTimer = null;
+
+  function showError(message) {
+    if (!errorBox) {
+      return;
+    }
+    errorBox.textContent = message;
+    errorBox.hidden = false;
+  }
+
+  function clearError() {
+    if (errorBox) {
+      errorBox.hidden = true;
+      errorBox.textContent = '';
+    }
+  }
+
+  function appendMessage(message) {
+    var empty = document.getElementById('empty-chat');
+    if (empty) {
+      empty.remove();
+    }
+
+    var item = document.createElement('article');
+    if (message.sender_user_id && message.sender_user_id === currentUserId) {
+      message.is_mine = true;
+    }
+    item.className = 'chat-message' + (message.is_mine ? ' mine' : '');
+
+    var meta = document.createElement('div');
+    meta.className = 'chat-message-meta';
+
+    var username = document.createElement('strong');
+    username.textContent = message.sender_username || 'Unknown';
+
+    var time = document.createElement('span');
+    time.textContent = message.sent_at_display || 'just now';
+
+    var text = document.createElement('p');
+    text.textContent = message.text || '';
+
+    meta.appendChild(username);
+    meta.appendChild(time);
+    item.appendChild(meta);
+    item.appendChild(text);
+    messages.appendChild(item);
+    messages.scrollTop = messages.scrollHeight;
+  }
+
+  function sendWithHttp(text) {
+    var body = new FormData();
+    body.append('text', text);
+
+    return fetch('/matches/' + matchId + '/chat/send', {
+      method: 'POST',
+      body: body,
+    }).then(function(response) {
+      if (!response.ok) {
+        return response.json().then(function(data) {
+          throw new Error(data.error || 'Could not send message.');
+        });
+      }
+      return response.json();
+    });
+  }
+
+  if (messages) {
+    messages.scrollTop = messages.scrollHeight;
+  }
+
+  if (socket && matchId) {
+    socket.emit('join', { match_id: matchId });
+
+    socket.on('receive_message', function(message) {
+      appendMessage(message);
+    });
+
+    socket.on('error', function(data) {
+      showError(data.message || 'Could not send message.');
+    });
+
+    socket.on('user_typing', function(data) {
+      if (!typingIndicator) {
+        return;
+      }
+      typingIndicator.textContent = (data.username || 'Someone') + ' is typing...';
+      typingIndicator.hidden = false;
+    });
+
+    socket.on('user_stopped_typing', function() {
+      if (typingIndicator) {
+        typingIndicator.hidden = true;
+      }
+    });
+  }
+
+  if (input && socket && matchId) {
+    input.addEventListener('input', function() {
+      socket.emit('typing', { match_id: matchId });
+      clearTimeout(typingTimer);
+      typingTimer = setTimeout(function() {
+        socket.emit('stop_typing', { match_id: matchId });
+      }, 900);
+    });
+  }
+
+  if (form && input) {
+    form.addEventListener('submit', function(event) {
+      event.preventDefault();
+      clearError();
+
+      var text = input.value.trim();
+      if (!text) {
+        return;
+      }
+
+      input.value = '';
+
+      if (socket && socket.connected) {
+        socket.emit('send_message', { match_id: matchId, text: text });
+        return;
+      }
+
+      sendWithHttp(text)
+        .then(function() {
+          appendMessage({
+            sender_username: 'You',
+            text: text,
+            sent_at_display: 'just now',
+            is_mine: true,
+          });
+        })
+        .catch(function(error) {
+          showError(error.message);
+          input.value = text;
+        });
+    });
+  }
+</script>
+{% endblock %}
