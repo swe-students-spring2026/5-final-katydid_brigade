@@ -23,20 +23,22 @@
   </section>
 
   {% if puzzle %}
-    {% if result %}
-      <section class="notice success">
-        <strong>{{ result.score }}/{{ result.total }} words found.</strong>
-        {% if result.matched %}
-          You matched. Their profile is now available in Matches.
-        {% endif %}
-      </section>
-    {% endif %}
+    <div id="puzzle-feedback">
+      {% if result %}
+        <section id="result-notice" class="notice success">
+          <strong>{{ result.score }}/{{ result.total }} words found.</strong>
+          {% if result.matched %}
+            You matched. Their profile is now available in Matches.
+          {% endif %}
+        </section>
+      {% endif %}
 
-    {% if outcome %}
-      <section class="notice {% if outcome.is_correct %}success{% else %}error{% endif %}">
-        {{ outcome.message }}
-      </section>
-    {% endif %}
+      {% if outcome %}
+        <section id="outcome-notice" class="notice {% if outcome.is_correct %}success{% else %}error{% endif %}">
+          {{ outcome.message }}
+        </section>
+      {% endif %}
+    </div>
 
     <div class="puzzle-layout">
       <section class="puzzle-panel">
@@ -53,34 +55,30 @@
           <label>
             Guess a word
             <div class="guess-row">
-              <input id="guess-input" name="guess" minlength="2" maxlength="10" pattern="[A-Za-z]+" autocomplete="off" required>
+              <input id="guess-input" name="guess" minlength="5" maxlength="10" pattern="[A-Za-z]+" autocomplete="off" required>
               <button type="button" id="backspace-btn" class="button" title="Backspace">&#x232B;</button>
             </div>
           </label>
           <button class="button primary" type="submit">Submit guess</button>
         </form>
 
-        {% if correct_guesses %}
-          <section class="found-words">
-            <h2>Found words</h2>
-            <div class="word-list">
-              {% for guess in correct_guesses %}
-                <span>{{ guess }}</span>
-              {% endfor %}
-            </div>
-          </section>
-        {% endif %}
+        <section id="found-words-section" class="found-words" {% if not correct_guesses %}hidden{% endif %}>
+          <h2>Found words</h2>
+          <div id="found-words-list" class="word-list">
+            {% for guess in correct_guesses %}
+              <span>{{ guess }}</span>
+            {% endfor %}
+          </div>
+        </section>
 
-        {% if all_guesses %}
-          <section class="found-words">
-            <h2>Previous guesses</h2>
-            <div class="word-list muted">
-              {% for guess in all_guesses %}
-                <span>{{ guess }}</span>
-              {% endfor %}
-            </div>
-          </section>
-        {% endif %}
+        <section id="previous-guesses-section" class="found-words" {% if not all_guesses %}hidden{% endif %}>
+          <h2>Previous guesses</h2>
+          <div id="previous-guesses-list" class="word-list muted">
+            {% for guess in all_guesses %}
+              <span>{{ guess }}</span>
+            {% endfor %}
+          </div>
+        </section>
       </section>
 
       {% if puzzle.questions %}
@@ -90,9 +88,9 @@
             <div class="clue-item">
               <p class="clue-question">{{ puzzle.questions[i] }}</p>
               {% if puzzle.answers[i].lower() in correct_guesses %}
-                <p class="clue-answer revealed">{{ puzzle.answers[i] }}</p>
+                <p class="clue-answer revealed" data-answer="{{ puzzle.answers[i].lower() }}">{{ puzzle.answers[i] }}</p>
               {% else %}
-                <p class="clue-answer hidden"> 🔒 </p>
+                <p class="clue-answer hidden" data-answer="{{ puzzle.answers[i].lower() }}" data-display-answer="{{ puzzle.answers[i] }}"> 🔒 </p>
               {% endif %}
             </div>
           {% endfor %}
@@ -115,34 +113,125 @@
 <script>
   var input = document.getElementById('guess-input');
   var selectedCells = [];
+  var form = document.querySelector('.puzzle-form');
 
-  document.querySelectorAll('.boggle-cell').forEach(function(btn) {
-    btn.addEventListener('click', function() {
-      if (input.value.length < 10) {
-        input.value += btn.textContent.trim().toLowerCase();
-        selectedCells.push(btn);
-        btn.classList.add('boggle-cell--selected');
-        input.focus();
-      }
-    });
-  });
-
-  document.getElementById('backspace-btn').addEventListener('click', function() {
-    if (input.value.length > 0) {
-      input.value = input.value.slice(0, -1);
-      var last = selectedCells.pop();
-      if (last && !selectedCells.includes(last)) {
-        last.classList.remove('boggle-cell--selected');
-      }
-      input.focus();
-    }
-  });
-
-  document.querySelector('.puzzle-form').addEventListener('submit', function() {
+  function clearSelectedCells() {
     document.querySelectorAll('.boggle-cell--selected').forEach(function(cell) {
       cell.classList.remove('boggle-cell--selected');
     });
     selectedCells = [];
-  });
+  }
+
+  function renderWordList(sectionId, listId, words) {
+    var section = document.getElementById(sectionId);
+    var list = document.getElementById(listId);
+
+    if (!section || !list) {
+      return;
+    }
+
+    section.hidden = words.length === 0;
+    list.innerHTML = '';
+    words.forEach(function(word) {
+      var item = document.createElement('span');
+      item.textContent = word;
+      list.appendChild(item);
+    });
+  }
+
+  function renderFeedback(data) {
+    var feedback = document.getElementById('puzzle-feedback');
+    if (!feedback) {
+      return;
+    }
+
+    feedback.innerHTML = '';
+
+    if (data.result) {
+      var resultNotice = document.createElement('section');
+      resultNotice.className = 'notice success';
+      resultNotice.innerHTML = '<strong>' + data.result.score + '/' + data.result.total + ' words found.</strong>';
+      if (data.result.matched) {
+        resultNotice.appendChild(document.createTextNode(' You matched. Their profile is now available in Matches.'));
+      }
+      feedback.appendChild(resultNotice);
+    }
+
+    if (data.outcome) {
+      var outcomeNotice = document.createElement('section');
+      outcomeNotice.className = 'notice ' + (data.outcome.is_correct ? 'success' : 'error');
+      outcomeNotice.textContent = data.outcome.message;
+      feedback.appendChild(outcomeNotice);
+    }
+  }
+
+  function revealClues(correctGuesses) {
+    document.querySelectorAll('.clue-answer').forEach(function(answer) {
+      if (correctGuesses.includes(answer.dataset.answer)) {
+        answer.classList.remove('hidden');
+        answer.classList.add('revealed');
+        answer.textContent = answer.dataset.displayAnswer || answer.textContent;
+      }
+    });
+  }
+
+  if (input && form) {
+    document.querySelectorAll('.boggle-cell').forEach(function(btn) {
+      btn.addEventListener('click', function() {
+        if (input.value.length < 10) {
+          input.value += btn.textContent.trim().toLowerCase();
+          selectedCells.push(btn);
+          btn.classList.add('boggle-cell--selected');
+          input.focus();
+        }
+      });
+    });
+
+    document.getElementById('backspace-btn').addEventListener('click', function() {
+      if (input.value.length > 0) {
+        input.value = input.value.slice(0, -1);
+        var last = selectedCells.pop();
+        if (last && !selectedCells.includes(last)) {
+          last.classList.remove('boggle-cell--selected');
+        }
+        input.focus();
+      }
+    });
+
+    form.addEventListener('submit', function(event) {
+      event.preventDefault();
+
+      fetch(form.action || window.location.href, {
+        method: 'POST',
+        body: new FormData(form),
+        headers: {
+          'X-Requested-With': 'XMLHttpRequest',
+        },
+      })
+        .then(function(response) {
+          if (!response.ok) {
+            throw new Error('Could not submit guess.');
+          }
+          return response.json();
+        })
+        .then(function(data) {
+          renderFeedback(data);
+          renderWordList('found-words-section', 'found-words-list', data.correct_guesses || []);
+          renderWordList('previous-guesses-section', 'previous-guesses-list', data.all_guesses || []);
+          revealClues(data.correct_guesses || []);
+          input.value = '';
+          clearSelectedCells();
+          input.focus();
+        })
+        .catch(function(error) {
+          renderFeedback({
+            outcome: {
+              is_correct: false,
+              message: error.message,
+            },
+          });
+        });
+    });
+  }
 </script>
 {% endblock %}
