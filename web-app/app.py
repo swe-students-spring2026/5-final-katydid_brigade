@@ -8,7 +8,7 @@ from flask_socketio import SocketIO, emit, join_room
 from bson.errors import InvalidId
 from bson.objectid import ObjectId
 from config import Config
-from flask import Flask, Response, flash, g, redirect, render_template, request, session, url_for
+from flask import Flask, Response, flash, g, jsonify, redirect, render_template, request, session, url_for
 from game_engine_client import create_puzzle, evaluate_guess
 from pymongo import MongoClient
 
@@ -426,10 +426,25 @@ def create_app(test_config=None):
 
         match_filter = {"_id": {"$in": puzzle_owner_ids, "$nin": exclude_ids}}
 
-        candidate = next(db.users.aggregate([
-            {"$match": match_filter},
-            {"$sample": {"size": 1}},
-        ]), None)
+        candidate = None
+        if request.method == "POST":
+            try:
+                posted_candidate_id = ObjectId(request.form.get("candidate_id", ""))
+            except (InvalidId, TypeError):
+                posted_candidate_id = None
+
+            if (
+                posted_candidate_id
+                and posted_candidate_id in puzzle_owner_ids
+                and posted_candidate_id not in exclude_ids
+            ):
+                candidate = db.users.find_one({"_id": posted_candidate_id})
+
+        if candidate is None:
+            candidate = next(db.users.aggregate([
+                {"$match": match_filter},
+                {"$sample": {"size": 1}},
+            ]), None)
 
         puzzles = list(db.puzzles.find({"owner_user_id": str(candidate["_id"])})) if candidate else []
         puzzle = puzzles[0] if puzzles else None
@@ -481,6 +496,14 @@ def create_app(test_config=None):
                     "target_user_id": str(candidate["_id"]),
                     "status": "matched",
                     "matched_at": date.today().isoformat(),
+                })
+
+            if request.headers.get("X-Requested-With") == "XMLHttpRequest":
+                return jsonify({
+                    "outcome": outcome,
+                    "result": result,
+                    "correct_guesses": correct_guesses,
+                    "all_guesses": all_guesses,
                 })
         elif puzzle:
             result = {
@@ -678,6 +701,7 @@ def create_app(test_config=None):
             messages=messages,
             partner=partner,
             total_messages=total_messages,
+            current_user_id=session.get("user_id"),
         )
 
     @app.route("/matches/<match_id>/chat/history")

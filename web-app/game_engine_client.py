@@ -1,6 +1,28 @@
 import requests
 
 
+def raise_for_game_engine_error(response):
+    try:
+        response.raise_for_status()
+    except requests.HTTPError as error:
+        try:
+            detail = response.json().get("detail")
+        except ValueError:
+            detail = response.text
+
+        if isinstance(detail, list):
+            messages = []
+            for item in detail:
+                location = ".".join(str(part) for part in item.get("loc", []))
+                message = item.get("msg", "Invalid request")
+                messages.append(f"{location}: {message}" if location else message)
+            detail = "; ".join(messages)
+
+        if detail:
+            raise requests.HTTPError(str(detail), response=response) from error
+        raise
+
+
 def create_puzzle(
     engine_url,
     question=None,
@@ -20,7 +42,7 @@ def create_puzzle(
         payload["answer"] = answer
 
     resp = requests.post(f"{engine_url}/puzzles", json=payload)
-    resp.raise_for_status()
+    raise_for_game_engine_error(resp)
     return resp.json()  # {question, answer, board, max_attempts}
 
 
@@ -35,15 +57,18 @@ def evaluate_guess(
     questions=None,
     answers=None,
 ):
-    resp = requests.post(f"{engine_url}/guesses", json={
+    payload = {
         "question": question,
-        "answer": answer,
         "questions": questions or [],
         "answers": answers or [],
         "board": board,
         "guess": guess,
         "previous_guesses": previous_guesses or [],
         "max_attempts": max_attempts,
-    })
-    resp.raise_for_status()
+    }
+    if answer is not None:
+        payload["answer"] = answer
+
+    resp = requests.post(f"{engine_url}/guesses", json=payload)
+    raise_for_game_engine_error(resp)
     return resp.json()  # {is_correct, is_on_board, attempts_remaining, puzzle_solved, ...}

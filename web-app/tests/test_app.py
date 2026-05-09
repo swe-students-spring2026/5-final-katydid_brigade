@@ -102,6 +102,52 @@ def test_dashboard_post_returns_result(logged_in_client):
     assert b"No puzzle-ready profiles" in response.data
 
 
+def test_dashboard_post_uses_submitted_candidate(logged_in_client, db, monkeypatch):
+    solver = db.users.find_one({"username": "session_user"})
+    first_target_id = db.users.insert_one({"username": "first_target"}).inserted_id
+    second_target_id = db.users.insert_one({"username": "second_target"}).inserted_id
+
+    db.puzzles.insert_many([
+        {
+            "owner_user_id": str(first_target_id),
+            "question": "Combined profile puzzle",
+            "answer": None,
+            "questions": ["Favorite food?"],
+            "answers": ["pizza"],
+            "board": [["P", "I"], ["Z", "A"]],
+            "max_attempts": 5,
+        },
+        {
+            "owner_user_id": str(second_target_id),
+            "question": "Combined profile puzzle",
+            "answer": None,
+            "questions": ["Favorite game?"],
+            "answers": ["chess"],
+            "board": [["C", "H"], ["E", "S"]],
+            "max_attempts": 5,
+        },
+    ])
+
+    def fake_evaluate_guess(*args, **kwargs):
+        assert kwargs["answers"] == ["pizza"]
+        return {"guess": "pizza", "is_correct": True, "message": "Correct"}
+
+    monkeypatch.setattr("app.evaluate_guess", fake_evaluate_guess)
+
+    response = logged_in_client.post(
+        "/dashboard",
+        data={"candidate_id": str(first_target_id), "guess": "pizza"},
+        headers={"X-Requested-With": "XMLHttpRequest"},
+    )
+
+    assert response.status_code == 200
+    assert response.json["correct_guesses"] == ["pizza"]
+    assert db.matches.count_documents({
+        "solver_user_id": str(solver["_id"]),
+        "target_user_id": str(first_target_id),
+    }) == 1
+
+
 # ---------------------------------------------------------------------------
 # Matches
 # ---------------------------------------------------------------------------
@@ -121,6 +167,22 @@ def test_match_detail_returns_200_for_existing_match(logged_in_client, db):
     })
     response = logged_in_client.get(f"/matches/{result.inserted_id}")
     assert response.status_code == 200
+
+
+def test_chat_page_returns_200_for_existing_match(logged_in_client, db):
+    solver = db.users.find_one({"username": "session_user"})
+    target_id = db.users.insert_one({"username": "target_user"}).inserted_id
+    result = db.matches.insert_one({
+        "solver_user_id": str(solver["_id"]),
+        "target_user_id": str(target_id),
+        "status": "matched",
+    })
+
+    response = logged_in_client.get(f"/matches/{result.inserted_id}/chat")
+
+    assert response.status_code == 200
+    assert b"target_user" in response.data
+    assert b"chat-form" in response.data
 
 
 def test_match_detail_returns_404_for_missing_match(logged_in_client):
